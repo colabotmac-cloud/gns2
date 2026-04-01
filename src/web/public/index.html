@@ -501,6 +501,71 @@
   </div>
 </div>
 
+<!-- EDIT AGENT MODAL -->
+<div class="modal-overlay" id="modal-edit-agent">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">Sửa AI Agent</div>
+      <button class="modal-close" onclick="closeEditAgent()">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-agent-id" />
+      <div class="field">
+        <label>Tên Agent</label>
+        <input type="text" id="edit-agent-name" />
+      </div>
+      <div class="field">
+        <label>Model</label>
+        <select id="edit-agent-model"></select>
+      </div>
+      <div class="form-error" id="edit-agent-error"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeEditAgent()">Huỷ</button>
+      <button class="btn primary" onclick="submitEditAgent()" id="btn-save-agent">Lưu</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT WORKER MODAL -->
+<div class="modal-overlay" id="modal-edit-worker">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">Sửa Worker</div>
+      <button class="modal-close" onclick="closeEditWorker()">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-worker-id" />
+      <div class="field">
+        <label>Tên Worker</label>
+        <input type="text" id="edit-worker-name" />
+      </div>
+      <div class="field">
+        <label>Telegram Bot Token <span style="color:var(--text-3);font-weight:400">(để trống = không đổi)</span></label>
+        <input type="text" id="edit-worker-token" placeholder="Để trống nếu không muốn đổi" />
+      </div>
+      <div class="field">
+        <label>Allowed User IDs <span style="color:var(--text-3);font-weight:400">(phân cách bằng dấu phẩy)</span></label>
+        <input type="text" id="edit-worker-users" />
+        <div class="hint">Tìm ID: nhắn <code>/start</code> cho <code>@userinfobot</code></div>
+      </div>
+      <div class="field">
+        <label>System Prompt</label>
+        <textarea id="edit-worker-prompt"></textarea>
+      </div>
+      <div class="field">
+        <label>PIN mới <span style="color:var(--text-3);font-weight:400">(để trống = không đổi)</span></label>
+        <input type="password" id="edit-worker-pin" placeholder="Để trống nếu không muốn đổi" />
+      </div>
+      <div class="form-error" id="edit-worker-error"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeEditWorker()">Huỷ</button>
+      <button class="btn primary" onclick="submitEditWorker()" id="btn-save-worker">Lưu</button>
+    </div>
+  </div>
+</div>
+
 <!-- SWAP AGENT MODAL -->
 <div class="modal-overlay" id="modal-swap-agent">
   <div class="modal">
@@ -615,6 +680,7 @@
             </div>
           </div>
           <div class="agent-side">
+            <button class="btn view" onclick="openEditAgent('${escHtml(a.id)}', '${escHtml(a.name)}', '${escHtml(a.model||'')}')">Sửa</button>
             <button class="btn danger" onclick="deleteAiAgent('${escHtml(a.id)}', '${escHtml(a.name)}')">Xoá</button>
           </div>
         </div>
@@ -656,7 +722,7 @@
     ];
     document.getElementById('agent-cli-cards').innerHTML = cards.map(c => `
       <div class="cli-card ${c.cls} ${!c.available?'disabled':''}" id="agent-cli-card-${c.id}"
-           onclick="${c.available?`selectAgentType('${c.id}')`:''}" >
+           onclick="${c.available?`selectAgentType('${c.id}')`:''}" >
         <span class="cli-status ${c.available?'ok':'missing'}">${c.available?'Có san':'Chua cai'}</span>
         <div class="cli-card-name">${c.name}</div>
         <div class="cli-card-sub">${c.sub}</div>
@@ -756,6 +822,7 @@
             ${w.running
               ? `<button class="btn stop" onclick="stopWorker('${w.id}')">Stop</button>`
               : `<button class="btn start" onclick="startWorker('${w.id}')">Start</button>`}
+            <button class="btn view" onclick="openEditWorker('${w.id}')">Sửa</button>
             <button class="btn swap" onclick="openSwapModal('${w.id}', '${escHtml(w.name)}', '${w.activeAgentId}')">Swap</button>
             <button class="btn danger" onclick="deleteWorker('${w.id}', '${escHtml(w.name)}')">Xoá</button>
           </div>
@@ -970,6 +1037,103 @@
   setInterval(() => {
     if (document.getElementById('page-logs').classList.contains('active')) loadLogs();
   }, 5000);
+
+  // ── Edit Agent ────────────────────────────────────────────────────────────────
+  function openEditAgent(id, name, model) {
+    document.getElementById('edit-agent-id').value = id;
+    document.getElementById('edit-agent-name').value = name;
+    document.getElementById('edit-agent-error').textContent = '';
+    // Detect type từ model name
+    const type = model.startsWith('gemini') ? 'gemini-cli' : 'claude-cli';
+    const models = MODELS[type] || [];
+    const sel = document.getElementById('edit-agent-model');
+    sel.innerHTML = models.map(m =>
+      `<option value="${m.value}"${m.value===model?' selected':''}>${m.label}</option>`
+    ).join('');
+    document.getElementById('modal-edit-agent').classList.add('open');
+  }
+
+  function closeEditAgent() {
+    document.getElementById('modal-edit-agent').classList.remove('open');
+  }
+
+  async function submitEditAgent() {
+    const id = document.getElementById('edit-agent-id').value;
+    const name = document.getElementById('edit-agent-name').value.trim();
+    const model = document.getElementById('edit-agent-model').value;
+    const errEl = document.getElementById('edit-agent-error');
+    if (!name) { errEl.textContent = 'Nhập tên agent'; return; }
+    const btn = document.getElementById('btn-save-agent');
+    btn.textContent = 'Đang lưu...'; btn.disabled = true;
+    const res = await api(`/api/ai-agents/${id}`, { method: 'PUT', body: JSON.stringify({ name, model }) });
+    btn.textContent = 'Lưu'; btn.disabled = false;
+    if (!res || !res.ok) { errEl.textContent = res?.error || 'Lỗi không xác định'; return; }
+    closeEditAgent();
+    loadAiAgents();
+  }
+
+  // ── Edit Worker ───────────────────────────────────────────────────────────────
+  async function openEditWorker(id) {
+    // Load worker data từ API workers list
+    const workers = await api('/api/workers');
+    const w = (workers || []).find(x => x.id === id);
+    if (!w) return;
+    // Load full worker detail (workers list không có botToken/allowedUsers)
+    // Dùng endpoint riêng — hoặc lấy từ session storage
+    document.getElementById('edit-worker-id').value = id;
+    document.getElementById('edit-worker-name').value = w.name;
+    document.getElementById('edit-worker-token').value = '';
+    document.getElementById('edit-worker-users').value = '';
+    document.getElementById('edit-worker-prompt').value = '';
+    document.getElementById('edit-worker-pin').value = '';
+    document.getElementById('edit-worker-error').textContent = '';
+
+    // Load chi tiết worker (có allowedUsers, systemPrompt)
+    const detail = await api(`/api/workers/${id}/detail`);
+    if (detail) {
+      document.getElementById('edit-worker-users').value = (detail.allowedUsers || []).join(', ');
+      document.getElementById('edit-worker-prompt').value = detail.systemPrompt || '';
+    }
+
+    document.getElementById('modal-edit-worker').classList.add('open');
+  }
+
+  function closeEditWorker() {
+    document.getElementById('modal-edit-worker').classList.remove('open');
+  }
+
+  async function submitEditWorker() {
+    const id = document.getElementById('edit-worker-id').value;
+    const name = document.getElementById('edit-worker-name').value.trim();
+    const botToken = document.getElementById('edit-worker-token').value.trim();
+    const usersRaw = document.getElementById('edit-worker-users').value.trim();
+    const systemPrompt = document.getElementById('edit-worker-prompt').value.trim();
+    const pin = document.getElementById('edit-worker-pin').value;
+    const errEl = document.getElementById('edit-worker-error');
+    errEl.textContent = '';
+
+    if (!name) { errEl.textContent = 'Nhập tên worker'; return; }
+
+    const body = { name, systemPrompt };
+    if (botToken) body.botToken = botToken;
+    if (usersRaw) {
+      const users = usersRaw.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
+      if (!users.length) { errEl.textContent = 'User ID không hợp lệ'; return; }
+      body.allowedUsers = users;
+    }
+    if (pin) {
+      if (pin.length < 4) { errEl.textContent = 'PIN ít nhất 4 ký tự'; return; }
+      body.pin = pin;
+    }
+
+    const btn = document.getElementById('btn-save-worker');
+    btn.textContent = 'Đang lưu...'; btn.disabled = true;
+    const res = await api(`/api/workers/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+    btn.textContent = 'Lưu'; btn.disabled = false;
+    if (!res || !res.ok) { errEl.textContent = res?.error || 'Lỗi không xác định'; return; }
+    closeEditWorker();
+    loadWorkers();
+  }
 
   function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
