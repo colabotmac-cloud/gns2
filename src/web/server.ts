@@ -180,9 +180,25 @@ app.get('/api/logs/:name', authMiddleware, (req: Request, res: Response) => {
 
 // ─── Start server ─────────────────────────────────────────────────────────────
 
-export function startWebServer() {
-  const config = loadGlobalConfig();
-  app.listen(config.port, () => {
-    console.log(`[web] Server chạy tại http://localhost:${config.port}`);
+export function startWebServer(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const config = loadGlobalConfig();
+
+    function tryListen(port: number) {
+      const server = app.listen(port, () => {
+        console.log(`[web] Server chạy tại http://localhost:${port}`);
+        resolve(port);
+      });
+      server.on('error', (err: NodeJS.ErrnoException) => {
+        if (err.code === 'EADDRINUSE') {
+          console.log(`[web] Port ${port} bận, thử ${port + 1}...`);
+          tryListen(port + 1);
+        } else {
+          reject(err);
+        }
+      });
+    }
+
+    tryListen(config.port);
   });
 }
