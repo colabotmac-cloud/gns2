@@ -1,8 +1,8 @@
 import { spawn } from 'child_process';
 import os from 'os';
 import path from 'path';
-import type { AgentProfile } from '../lib/config.js';
-import { loadGeminiHistory, appendGeminiHistory } from '../lib/session.js';
+import type { AgentInstance, WorkerInstance } from '../lib/config.js';
+import { getRecentLog } from '../lib/session.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -20,7 +20,6 @@ function runCommand(
   timeoutMs: number
 ): Promise<string> {
   return new Promise((resolve, reject) => {
-    // Thêm ~/.local/bin và ~/.npm-global/bin vào PATH để tìm được claude/gemini
     const localBin = path.join(os.homedir(), '.local', 'bin');
     const npmBin = path.join(os.homedir(), '.npm-global', 'bin');
     const env = {
@@ -57,12 +56,10 @@ function runCommand(
 }
 
 // ─── Claude Adapter ───────────────────────────────────────────────────────────
-// Claude nhớ context qua session file của chính nó (~/.claude/projects/...)
-// isNewSession = true  → dùng --session-id (tạo mới)
-// isNewSession = false → dùng --resume (tiếp tục)
 
 export async function callClaude(
-  profile: AgentProfile,
+  agent: AgentInstance,
+  worker: WorkerInstance,
   prompt: string,
   isNewSession: boolean
 ): Promise<string> {
@@ -70,33 +67,32 @@ export async function callClaude(
     '--print',
     '--permission-mode', 'bypassPermissions',
     '--output-format', 'text',
-    '--max-turns', String(profile.maxTurns ?? 5),
-    isNewSession ? '--session-id' : '--resume',
-    profile.sessionId,
-    prompt,
+    '--max-turns', '5',
+    '--model', agent.model || 'claude-sonnet-4-5',
   ];
 
-  const cwd = profile.workingDir ?? os.homedir();
-  return runCommand('claude', args, cwd, profile.timeoutMs ?? 180_000);
+  if (worker.systemPrompt) {
+    args.push('--system-prompt', worker.systemPrompt);
+  }
+
+  args.push(isNewSession ? '--session-id' : '--resume', agent.sessionId);
+  args.push(prompt);
+
+  const cwd = os.homedir();
+  return runCommand('claude', args, cwd, 180_000);
 }
 
 // ─── Gemini Adapter ───────────────────────────────────────────────────────────
-// Gemini không có bộ nhớ → tự inject lịch sử vào prompt mỗi lần gọi
 
-const GEMINI_HISTORY_TURNS = 20; // Số lượt gần nhất inject vào prompt
+const GEMINI_HISTORY_TURNS = 20;
 
-function buildGeminiPrompt(profile: AgentProfile, newMessage: string): string {
-  const history = loadGeminiHistory(profile);
-
-  // Lấy N turns gần nhất (1 turn = 1 user + 1 assistant)
-  const recent = history.slice(-(GEMINI_HISTORY_TURNS * 2));
+function buildGeminiPrompt(worker: WorkerInstance, newMessage: string): string {
+  const recent = getRecentLog(worker, GEMINI_HISTORY_TURNS);
 
   if (recent.length === 0) {
-    // Chưa có lịch sử → gọi thẳng
     return newMessage;
   }
 
-  // Ghép lịch sử vào đầu prompt
   const historyText = recent
     .map(m => `[${m.role === 'user' ? 'User' : 'Assistant'}]: ${m.content}`)
     .join('\n');
@@ -110,36 +106,57 @@ function buildGeminiPrompt(profile: AgentProfile, newMessage: string): string {
 }
 
 export async function callGemini(
-  profile: AgentProfile,
+  agent: AgentInstance,
+  worker: WorkerInstance,
   prompt: string
 ): Promise<string> {
-  const fullPrompt = buildGeminiPrompt(profile, prompt);
-  const cwd = profile.workingDir ?? os.homedir();
+  const fullPrompt = buildGeminiPrompt(worker, prompt);
+  const cwd = os.homedir();
 
-  const response = await runCommand(
-    'gemini',
-    ['-p', fullPrompt],
-    cwd,
-    profile.timeoutMs ?? 180_000
-  );
+  const args: string[] = [];
+  if (agent.model) {
+    args.push('-m', agent.model);
+  }
+  if (worker.systemPrompt) {
+    args.push('-s', worker.systemPrompt);
+  }
+  args.push('-p', fullPrompt);
 
-  // Lưu tin nhắn mới vào lịch sử sau khi có response
-  appendGeminiHistory(profile, 'user', prompt);
-  appendGeminiHistory(profile, 'assistant', response);
-
-  return response;
+  return runCommand('gemini', args, cwd, 180_000);
 }
 
 // ─── Unified call ─────────────────────────────────────────────────────────────
 
 export async function callAI(
-  profile: AgentProfile,
+  agent: AgentInstance,
+  worker: WorkerInstance,
   prompt: string,
   isNewSession: boolean
 ): Promise<string> {
-  if (profile.cli === 'claude') {
-    return callClaude(profile, prompt, isNewSession);
+  if (agent.type === 'claude-cli') {
+    return callClaude(agent, worker, prompt, isNewSession);
   } else {
-    return callGemini(profile, prompt);
+    return callGemini(agent, worker, prompt);
+  }
+}
+
+// ─── Handoff Summary ──────────────────────────────────────────────────────────
+
+export async function generateHandoffSummary(
+  agent: AgentInstance,
+  worker: WorkerInstance
+): Promise<string> {
+  const summaryPrompt = 'Summarize our conversation so far in 3-5 sentences for handoff to another AI agent. Be concise.';
+
+  try {
+    const result = await Promise.race([
+      callAI(agent, worker, summaryPrompt, false),
+      new Promise<string>((_, reject) =>
+        setTimeout(() => reject(new Error('Handoff timeout')), 30_000)
+      ),
+    ]);
+    return result;
+  } catch {
+    return '';
   }
 }

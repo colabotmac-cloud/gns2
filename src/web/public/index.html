@@ -444,6 +444,10 @@
           <div class="cli-cards" id="agent-cli-cards"></div>
           <input type="hidden" id="new-agent-type" />
         </div>
+        <div class="field" id="field-model">
+          <label>Model</label>
+          <select id="new-agent-model"></select>
+        </div>
         <div class="form-error" id="agent-form-error"></div>
       </div>
     </div>
@@ -605,9 +609,9 @@
             <div class="agent-meta">
               <span class="badge ${a.type}">${a.type}</span>
               <span class="meta-sep">·</span>
-              <span style="font-family:monospace;font-size:11px">${a.id.substring(0,8)}…</span>
+              <span style="font-family:monospace;font-size:11px">${escHtml(a.model || '?')}</span>
               <span class="meta-sep">·</span>
-              <span>Session: ${a.sessionId.substring(0,8)}…</span>
+              <span style="font-family:monospace;font-size:11px">${a.id.substring(0,8)}…</span>
             </div>
           </div>
           <div class="agent-side">
@@ -666,12 +670,32 @@
     document.getElementById('agent-modal-footer').style.display = 'flex';
   }
 
+  const MODELS = {
+    'claude-cli': [
+      { value: 'claude-opus-4-5',    label: 'Claude Opus 4.5   (mạnh nhất)' },
+      { value: 'claude-sonnet-4-5',  label: 'Claude Sonnet 4.5 (khuyến nghị)' },
+      { value: 'claude-haiku-3-5',   label: 'Claude Haiku 3.5  (nhanh nhất)' },
+    ],
+    'gemini-cli': [
+      { value: 'gemini-2.5-pro',    label: 'Gemini 2.5 Pro   (mạnh nhất)' },
+      { value: 'gemini-2.5-flash',  label: 'Gemini 2.5 Flash (khuyến nghị)' },
+      { value: 'gemini-2.0-flash',  label: 'Gemini 2.0 Flash (nhanh nhất)' },
+    ],
+  };
+
   function selectAgentType(type) {
     selectedAgentType = type;
     document.getElementById('new-agent-type').value = type;
     document.querySelectorAll('.cli-card').forEach(c => c.classList.remove('selected'));
     const card = document.getElementById(`agent-cli-card-${type}`);
     if (card) card.classList.add('selected');
+
+    // Cập nhật danh sách model
+    const sel = document.getElementById('new-agent-model');
+    const models = MODELS[type] || [];
+    sel.innerHTML = models.map((m, i) =>
+      `<option value="${m.value}"${i===1?' selected':''}>${m.label}</option>`
+    ).join('');
   }
 
   function closeNewAgent() {
@@ -681,18 +705,20 @@
   async function submitNewAgent() {
     const name = document.getElementById('new-agent-name').value.trim();
     const type = document.getElementById('new-agent-type').value;
+    const model = document.getElementById('new-agent-model').value;
     const errEl = document.getElementById('agent-form-error');
     errEl.textContent = '';
 
     if (!name) { errEl.textContent = 'Nhập tên agent'; return; }
     if (!type) { errEl.textContent = 'Chọn loại CLI'; return; }
+    if (!model) { errEl.textContent = 'Chọn model'; return; }
 
     const btn = document.getElementById('btn-create-agent');
     btn.textContent = 'Đang tạo...'; btn.disabled = true;
 
     const res = await api('/api/ai-agents', {
       method: 'POST',
-      body: JSON.stringify({ name, type })
+      body: JSON.stringify({ name, type, model })
     });
 
     btn.textContent = 'Tạo Agent'; btn.disabled = false;

@@ -3,7 +3,20 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import path from 'path';
 import crypto from 'crypto';
-import { loadGlobalConfig, checkAvailableClis, saveAgent, loadAgent, AgentProfile } from '../lib/config.js';
+import {
+  loadGlobalConfig,
+  checkAvailableClis,
+  listAiAgents,
+  loadAiAgent,
+  saveAiAgent,
+  deleteAiAgent,
+  listWorkers,
+  loadWorker,
+  saveWorker,
+  deleteWorker,
+  AgentInstance,
+  WorkerInstance,
+} from '../lib/config.js';
 import { listBackups, readBackup } from '../lib/backup.js';
 import { readLog } from '../lib/logger.js';
 import { manager } from '../bot/manager.js';
@@ -18,8 +31,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Serve HTML tĩnh từ src/web/public/
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, '..', '..', 'src', 'web', 'public')));
 
 // ─── Auth middleware ──────────────────────────────────────────────────────────
 
@@ -57,90 +69,152 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
   }
 });
 
-// ─── GET /api/agents ──────────────────────────────────────────────────────────
-// Danh sách tất cả agents + trạng thái running/stopped
+// ─── GET /api/ai-agents ───────────────────────────────────────────────────────
 
-app.get('/api/agents', authMiddleware, (_req: Request, res: Response) => {
+app.get('/api/ai-agents', authMiddleware, (_req: Request, res: Response) => {
   try {
-    res.json(manager.listStatus());
+    res.json(listAiAgents());
   } catch (err) {
     res.status(500).json({ error: String(err) });
   }
 });
 
-// ─── POST /api/agents/start/:name ─────────────────────────────────────────────
+// ─── POST /api/ai-agents ──────────────────────────────────────────────────────
 
-app.post('/api/agents/start/:name', authMiddleware, (req: Request, res: Response) => {
+app.post('/api/ai-agents', authMiddleware, (req: Request, res: Response) => {
   try {
-    manager.startAgent(req.params.name);
+    const { name, type, model } = req.body ?? {};
+    if (!name || !type) {
+      res.status(400).json({ error: 'Thiếu name hoặc type' }); return;
+    }
+    if (type !== 'claude-cli' && type !== 'gemini-cli') {
+      res.status(400).json({ error: 'type phải là claude-cli hoặc gemini-cli' }); return;
+    }
+    const available = checkAvailableClis();
+    const cliKey = type === 'claude-cli' ? 'claude' : 'gemini';
+    if (!available[cliKey]) {
+      res.status(400).json({ error: `CLI "${cliKey}" chưa được cài trên máy này` }); return;
+    }
+    // Default model nếu không chọn
+    const defaultModel = type === 'claude-cli' ? 'claude-sonnet-4-5' : 'gemini-2.5-pro';
+    const agent: AgentInstance = {
+      id: crypto.randomUUID(),
+      name,
+      type,
+      model: model || defaultModel,
+      sessionId: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+    };
+    saveAiAgent(agent);
+    res.json({ ok: true, agent });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// ─── DELETE /api/ai-agents/:id ────────────────────────────────────────────────
+
+app.delete('/api/ai-agents/:id', authMiddleware, (_req: Request, res: Response) => {
+  try {
+    deleteAiAgent(_req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// ─── GET /api/workers ─────────────────────────────────────────────────────────
+
+app.get('/api/workers', authMiddleware, (_req: Request, res: Response) => {
+  try {
+    res.json(manager.listWorkerStatus());
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// ─── POST /api/workers ────────────────────────────────────────────────────────
+
+app.post('/api/workers', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { name, botToken, allowedUsers, systemPrompt, pin, agentId } = req.body ?? {};
+    if (!name || !botToken || !allowedUsers || !pin || !agentId) {
+      res.status(400).json({ error: 'Thiếu thông tin bắt buộc' }); return;
+    }
+    if (!loadAiAgent(agentId)) {
+      res.status(400).json({ error: `Agent "${agentId}" không tồn tại` }); return;
+    }
+    const sessionPin = await bcrypt.hash(String(pin), 10);
+    const worker: WorkerInstance = {
+      id: crypto.randomUUID(),
+      name,
+      botToken,
+      allowedUsers: (allowedUsers as number[]).map(Number).filter(n => !isNaN(n)),
+      systemPrompt: systemPrompt ?? '',
+      sessionPin,
+      activeAgentId: agentId,
+      conversationLog: [],
+      createdAt: new Date().toISOString(),
+    };
+    saveWorker(worker);
+    res.json({ ok: true, worker: { ...worker, sessionPin: '[hashed]', conversationLog: [] } });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// ─── DELETE /api/workers/:id ──────────────────────────────────────────────────
+
+app.delete('/api/workers/:id', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    await manager.stopWorker(req.params.id);
+    deleteWorker(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// ─── POST /api/workers/:id/start ─────────────────────────────────────────────
+
+app.post('/api/workers/:id/start', authMiddleware, (req: Request, res: Response) => {
+  try {
+    manager.startWorker(req.params.id);
     res.json({ ok: true });
   } catch (err) {
     res.status(400).json({ error: String(err) });
   }
 });
 
-// ─── POST /api/agents/stop/:name ──────────────────────────────────────────────
+// ─── POST /api/workers/:id/stop ──────────────────────────────────────────────
 
-app.post('/api/agents/stop/:name', authMiddleware, async (req: Request, res: Response) => {
+app.post('/api/workers/:id/stop', authMiddleware, async (req: Request, res: Response) => {
   try {
-    await manager.stopAgent(req.params.name);
+    await manager.stopWorker(req.params.id);
     res.json({ ok: true });
   } catch (err) {
     res.status(400).json({ error: String(err) });
+  }
+});
+
+// ─── POST /api/workers/:id/swap ──────────────────────────────────────────────
+
+app.post('/api/workers/:id/swap', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { agentId } = req.body ?? {};
+    if (!agentId) { res.status(400).json({ error: 'Thiếu agentId' }); return; }
+    await manager.swapAgent(req.params.id, agentId);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
   }
 });
 
 // ─── GET /api/system/clis ─────────────────────────────────────────────────────
-// Quét hệ thống xem có claude / gemini CLI không
 
 app.get('/api/system/clis', authMiddleware, (_req: Request, res: Response) => {
   try {
     res.json(checkAvailableClis());
-  } catch (err) {
-    res.status(500).json({ error: String(err) });
-  }
-});
-
-// ─── POST /api/agents ─────────────────────────────────────────────────────────
-// Tạo agent mới
-
-app.post('/api/agents', authMiddleware, (req: Request, res: Response) => {
-  try {
-    const { name, cli, botToken, allowedUsers } = req.body ?? {};
-    if (!name || !cli || !botToken || !allowedUsers) {
-      res.status(400).json({ error: 'Thiếu thông tin bắt buộc' }); return;
-    }
-    if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
-      res.status(400).json({ error: 'Tên chỉ dùng a-z, 0-9, _, -' }); return;
-    }
-    if (loadAgent(name)) {
-      res.status(400).json({ error: `Agent "${name}" đã tồn tại` }); return;
-    }
-    const available = checkAvailableClis();
-    if (!available[cli as 'claude' | 'gemini']) {
-      res.status(400).json({ error: `CLI "${cli}" chưa được cài trên máy này` }); return;
-    }
-    const profile: AgentProfile = {
-      name, cli, botToken,
-      allowedUsers: (allowedUsers as number[]).map(Number).filter(n => !isNaN(n)),
-      sessionId: crypto.randomUUID(),
-    };
-    saveAgent(profile);
-    res.json({ ok: true, profile });
-  } catch (err) {
-    res.status(500).json({ error: String(err) });
-  }
-});
-
-// ─── DELETE /api/agents/:name ─────────────────────────────────────────────────
-
-app.delete('/api/agents/:name', authMiddleware, async (req: Request, res: Response) => {
-  try {
-    const { name } = req.params;
-    await manager.stopAgent(name);
-    const { deleteAgent } = await import('../lib/config.js');
-    deleteAgent(name);
-    res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: String(err) });
   }
