@@ -5,34 +5,55 @@ import crypto from 'crypto';
 import { execSync } from 'child_process';
 
 const CONFIG_DIR = path.join(os.homedir(), '.config', 'gns2');
-const AGENTS_DIR = path.join(CONFIG_DIR, 'agents');
+const AI_AGENTS_DIR = path.join(CONFIG_DIR, 'ai-agents');
+const WORKERS_DIR = path.join(CONFIG_DIR, 'workers');
 const GLOBAL_CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface GlobalConfig {
-  port: number;         // Port web UI, default 8823
-  adminUser: string;    // Username đăng nhập web
-  adminHash: string;    // Bcrypt hash của password
-  jwtSecret: string;    // Secret để ký JWT token
+  port: number;
+  adminUser: string;
+  adminHash: string;
+  jwtSecret: string;
 }
 
-export interface AgentProfile {
-  name: string;                    // Tên agent, dùng làm tên file
-  cli: 'claude' | 'gemini';        // Dùng AI nào
-  botToken: string;                // Telegram bot token
-  allowedUsers: number[];          // Danh sách Telegram user ID được phép nhắn
-  sessionId: string;               // UUID cố định, không đổi trừ khi /new
-  workingDir?: string;             // Thư mục làm việc (Claude cần để tìm session file)
-  maxTurns?: number;               // Giới hạn lượt xử lý mỗi tin nhắn (Claude only)
-  timeoutMs?: number;              // Timeout chờ AI trả lời, default 3 phút
+export interface AgentInstance {
+  id: string;           // uuid
+  name: string;         // display name
+  type: 'claude-cli' | 'gemini-cli';
+  sessionId: string;    // Claude --resume ID (created at Agent creation time)
+  createdAt: string;
+}
+
+export interface LogEntry {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+  agentId: string;
+}
+
+export interface WorkerInstance {
+  id: string;           // uuid
+  name: string;
+  botToken: string;
+  allowedUsers: number[];
+  systemPrompt: string;
+  sessionPin: string;   // bcrypt hash of PIN
+  activeAgentId: string;
+  conversationLog: LogEntry[];
+  handoffContext?: string;
+  createdAt: string;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function ensureDirs() {
-  if (!fs.existsSync(AGENTS_DIR)) {
-    fs.mkdirSync(AGENTS_DIR, { recursive: true });
+  if (!fs.existsSync(AI_AGENTS_DIR)) {
+    fs.mkdirSync(AI_AGENTS_DIR, { recursive: true });
+  }
+  if (!fs.existsSync(WORKERS_DIR)) {
+    fs.mkdirSync(WORKERS_DIR, { recursive: true });
   }
 }
 
@@ -52,10 +73,9 @@ export function loadGlobalConfig(): GlobalConfig {
 export function saveGlobalConfig(config: GlobalConfig) {
   ensureDirs();
   fs.writeFileSync(GLOBAL_CONFIG_FILE, JSON.stringify(config, null, 2), 'utf-8');
-  fs.chmodSync(GLOBAL_CONFIG_FILE, 0o600); // Chỉ owner đọc được
+  fs.chmodSync(GLOBAL_CONFIG_FILE, 0o600);
 }
 
-// Tạo global config mặc định (dùng trong setup)
 export function createDefaultGlobalConfig(adminUser: string, adminHash: string): GlobalConfig {
   return {
     port: 8823,
@@ -65,31 +85,59 @@ export function createDefaultGlobalConfig(adminUser: string, adminHash: string):
   };
 }
 
-// ─── Agent Profiles ──────────────────────────────────────────────────────────
+// ─── AI Agent CRUD ───────────────────────────────────────────────────────────
 
-export function listAgents(): AgentProfile[] {
+export function listAiAgents(): AgentInstance[] {
   ensureDirs();
-  const files = fs.readdirSync(AGENTS_DIR).filter(f => f.endsWith('.json'));
+  const files = fs.readdirSync(AI_AGENTS_DIR).filter(f => f.endsWith('.json'));
   return files.map(f => {
-    return JSON.parse(fs.readFileSync(path.join(AGENTS_DIR, f), 'utf-8')) as AgentProfile;
+    return JSON.parse(fs.readFileSync(path.join(AI_AGENTS_DIR, f), 'utf-8')) as AgentInstance;
   });
 }
 
-export function loadAgent(name: string): AgentProfile | null {
-  const file = path.join(AGENTS_DIR, `${name}.json`);
+export function loadAiAgent(id: string): AgentInstance | null {
+  const file = path.join(AI_AGENTS_DIR, `${id}.json`);
   if (!fs.existsSync(file)) return null;
   return JSON.parse(fs.readFileSync(file, 'utf-8'));
 }
 
-export function saveAgent(profile: AgentProfile) {
+export function saveAiAgent(agent: AgentInstance): void {
   ensureDirs();
-  const file = path.join(AGENTS_DIR, `${profile.name}.json`);
-  fs.writeFileSync(file, JSON.stringify(profile, null, 2), 'utf-8');
+  const file = path.join(AI_AGENTS_DIR, `${agent.id}.json`);
+  fs.writeFileSync(file, JSON.stringify(agent, null, 2), 'utf-8');
   fs.chmodSync(file, 0o600);
 }
 
-export function deleteAgent(name: string) {
-  const file = path.join(AGENTS_DIR, `${name}.json`);
+export function deleteAiAgent(id: string): void {
+  const file = path.join(AI_AGENTS_DIR, `${id}.json`);
+  if (fs.existsSync(file)) fs.unlinkSync(file);
+}
+
+// ─── Worker CRUD ─────────────────────────────────────────────────────────────
+
+export function listWorkers(): WorkerInstance[] {
+  ensureDirs();
+  const files = fs.readdirSync(WORKERS_DIR).filter(f => f.endsWith('.json'));
+  return files.map(f => {
+    return JSON.parse(fs.readFileSync(path.join(WORKERS_DIR, f), 'utf-8')) as WorkerInstance;
+  });
+}
+
+export function loadWorker(id: string): WorkerInstance | null {
+  const file = path.join(WORKERS_DIR, `${id}.json`);
+  if (!fs.existsSync(file)) return null;
+  return JSON.parse(fs.readFileSync(file, 'utf-8'));
+}
+
+export function saveWorker(worker: WorkerInstance): void {
+  ensureDirs();
+  const file = path.join(WORKERS_DIR, `${worker.id}.json`);
+  fs.writeFileSync(file, JSON.stringify(worker, null, 2), 'utf-8');
+  fs.chmodSync(file, 0o600);
+}
+
+export function deleteWorker(id: string): void {
+  const file = path.join(WORKERS_DIR, `${id}.json`);
   if (fs.existsSync(file)) fs.unlinkSync(file);
 }
 
@@ -116,7 +164,6 @@ export function checkAvailableClis(): CliCheckResult {
   };
 }
 
-// Dùng trong install.sh / setup — dừng nếu không có CLI nào
 export function assertCliAvailable(cli: 'claude' | 'gemini') {
   const available = checkAvailableClis();
   if (!available[cli]) {
@@ -125,7 +172,7 @@ export function assertCliAvailable(cli: 'claude' | 'gemini') {
       gemini: 'npm install -g @google/gemini-cli\nSau đó chạy: gemini   (để đăng nhập lần đầu)',
     };
     throw new Error(
-      `❌ Không tìm thấy "${cli}" trên máy này.\n` +
+      `Không tìm thấy "${cli}" trên máy này.\n` +
       `Cài trước bằng lệnh:\n\n${instructions[cli]}\n`
     );
   }

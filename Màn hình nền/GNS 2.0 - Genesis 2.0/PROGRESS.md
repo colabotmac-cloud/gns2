@@ -98,22 +98,70 @@ Xem chi tiết: `docs/Part1-Research.md`
 
 - ✅ Test end-to-end: Telegram ↔ Claude nhớ session — PASSED
 
+#### Bug fixes sau test thực tế ✅ DONE (2026-04-01)
+- **409 Conflict**: 2 instance cùng token → fix bằng PID file (`~/.config/gns2/gns2.pid`)
+  - Khi `npm start`: tự detect + kill instance cũ, đợi port release, rồi mới start mới
+- **EADDRINUSE**: port bận sau restart → `startWebServer()` tự thử port kế tiếp thay vì crash
+- **Kết quả**: restart bao nhiêu lần cũng không cần kill thủ công
+- GitHub cập nhật: https://github.com/colabotmac-cloud/gns2
+
 #### P1.7: Báo cáo final Phần 1 ✅ DONE (2026-03-31)
 Xem: `docs/Part1-Report.md`
 
 ---
 
-## PHẦN 1: ✅ HOÀN TẤT (2026-03-31)
+## PHẦN 1: ✅ HOÀN TẤT (2026-04-01)
 
 ---
 
-## PHẦN 2: (TBD)
-**Trạng thái: ⏳ Chờ định nghĩa scope**
+## PHẦN 2: Agent Instance + Worker Instance Architecture
+**Trạng thái: ✅ HOÀN TẤT (2026-04-01)**
+**Bắt đầu: 2026-04-01**
+
+### Mục tiêu
+Tách kiến trúc thành 2 tầng rõ ràng:
+1. [x] Agent Instance — pool AI brain độc lập (claude-cli / gemini-cli)
+2. [x] Worker Instance — Telegram bot có memory riêng (conversationLog)
+3. [x] Neutral conversation log — source of truth cho memory, cả Claude + Gemini sync vào
+4. [x] Swap Agent — đổi AI brain cho Worker, có handoff summary, memory không mất
+5. [x] Web UI mới — trang Agents + Workers + Swap modal
+6. [x] Báo cáo → `docs/Part2-Report.md`
+
+### Tiến độ chi tiết
+
+#### P2.1: Kiến trúc & Data Model ✅ DONE (2026-04-01)
+- Thảo luận và chốt kiến trúc 2 tầng: `arch_log_part2.md`
+- `AgentInstance`: id, name, type, sessionId, createdAt
+- `WorkerInstance`: id, name, botToken, allowedUsers, systemPrompt, sessionPin, activeAgentId, conversationLog, handoffContext
+- `LogEntry`: role, content, timestamp, agentId
+
+#### P2.2: Refactor toàn bộ codebase ✅ DONE (2026-04-01)
+- `src/lib/config.ts` — AgentInstance + WorkerInstance CRUD, thư mục `ai-agents/` + `workers/`
+- `src/lib/session.ts` — neutral log helpers (appendToLog, getRecentLog, clearLog, getLogStats)
+- `src/lib/backup.ts` — backup từ conversationLog thay session file riêng
+- `src/bot/adapters.ts` — callClaude/callGemini nhận (agent, worker), Gemini inject từ neutral log, generateHandoffSummary
+- `src/bot/telegram-bot.ts` — constructor (worker, agent), `/clearhistory` + PIN thay `/new`
+- `src/bot/manager.ts` — swapAgent() với handoff summary, keyed by workerId
+- `src/web/server.ts` — `/api/ai-agents` + `/api/workers` endpoints + swap
+- `src/web/public/index.html` — UI mới 4 pages với Swap modal
+- `src/setup.ts` — wizard tạo Agent trước → Worker sau
+- Build TypeScript: 0 lỗi ✅
+
+#### P2.3: Test end-to-end ✅ DONE (2026-04-01)
+- ✅ Login web UI
+- ✅ Tạo Agent (claude-cli, auto-detect)
+- ✅ Tạo Worker (chọn agent từ pool, PIN, system prompt)
+- ✅ Delete Worker + Agent
+- ✅ APIs: /api/ai-agents, /api/workers, /api/system/clis
+
+---
+
+## PHẦN 2: ✅ HOÀN TẤT (2026-04-01)
 
 ---
 
 ## PHẦN 3: (TBD)
-**Trạng thái: ⏳ Chờ Phần 2 hoàn tất**
+**Trạng thái: ⏳ Chờ định nghĩa scope**
 
 ---
 

@@ -1,5 +1,5 @@
 # Báo cáo Phần 1 — GNS 2.0
-> Hoàn thành: 2026-03-31
+> Hoàn thành: 2026-04-01
 
 ---
 
@@ -40,9 +40,9 @@ Phần 1 đã xây dựng xong toàn bộ nền móng của GNS 2.0:
 ### Entry + Setup
 | File | Chức năng |
 |---|---|
-| `src/index.ts` | Boot: load config → web server → start agents → graceful shutdown |
+| `src/index.ts` | Boot: kill instance cũ (PID file) → load config → web server → start agents → graceful shutdown |
 | `src/setup.ts` | Wizard: detect CLI → auto-detect port trống → admin account → tạo agent |
-| `install.sh` | Check Node + offer cài CLI + npm install + build + offer setup |
+| `install.sh` | Check Node + CLI (báo có/không) + npm install + build + offer setup |
 
 ---
 
@@ -91,10 +91,12 @@ npm start
 
 ## Đã test
 - ✅ Build TypeScript không lỗi
-- ✅ Login Web UI
+- ✅ Login Web UI (admin / cola8823)
 - ✅ Tạo agent qua Web UI với auto-detect CLI
 - ✅ Telegram bot nhận tin + Claude trả lời + nhớ session
 - ✅ Port auto-detect nếu 8823 bị bận
+- ✅ Restart không cần kill thủ công — PID file tự xử lý
+- ✅ Không còn lỗi 409 Conflict hay EADDRINUSE
 
 ---
 
@@ -104,4 +106,6 @@ npm start
 - **Backup dir**: `GNS 2.0 - Genesis 2.0/session-backup/`
 - **Config dir**: `~/.config/gns2/`
 - **Log dir**: `~/.config/gns2/logs/`
-- **Port mặc định**: 8823 (tự detect port trống nếu bận)
+- **PID file**: `~/.config/gns2/gns2.pid` — tự kill instance cũ khi start mới
+- **Port mặc định**: 8823 (tự detect port trống nếu bận, cả lúc start server)
+- **GitHub**: https://github.com/colabotmac-cloud/gns2

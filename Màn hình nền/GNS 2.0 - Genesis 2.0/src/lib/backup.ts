@@ -1,8 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import type { AgentProfile } from './config.js';
-import { getClaudeSessionPath, getGeminiHistoryPath, getSessionStats, type Message } from './session.js';
+import type { AgentInstance, WorkerInstance, LogEntry } from './config.js';
+import { getLogStats } from './session.js';
 
 // Thư mục backup nằm trong workspace GNS 2.0
 const BACKUP_DIR = path.join(
@@ -21,14 +21,13 @@ const BACKUP_THRESHOLD_BYTES = 500 * 1024; // 500KB
 export interface BackupFile {
   filename: string;
   agentName: string;
-  createdAt: string;   // Lấy từ tên file
+  createdAt: string;
   sizeBytes: number;
   filePath: string;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-// Định dạng thời gian Việt Nam cho tên file
 function vnDatetime(date: Date): string {
   const vn = new Date(date.getTime() + 7 * 60 * 60 * 1000);
   const y = vn.getUTCFullYear();
@@ -39,76 +38,36 @@ function vnDatetime(date: Date): string {
   return `${y}-${mo}-${d}_${h}-${mi}`;
 }
 
-// Tên file backup theo chuẩn đã chốt
-// {AgentName}_{8 ký tự sessionId}_{YYYY-MM-DD_HH-mm}.md
-function buildFilename(profile: AgentProfile): string {
-  const shortSession = profile.sessionId.replace(/-/g, '').substring(0, 8);
+// {workerName}_{8chars-workerId}_{datetime}.md
+function buildFilename(worker: WorkerInstance): string {
+  const shortId = worker.id.replace(/-/g, '').substring(0, 8);
   const datetime = vnDatetime(new Date());
-  return `${profile.name}_${shortSession}_${datetime}.md`;
+  return `${worker.name}_${shortId}_${datetime}.md`;
 }
 
 // ─── Kiểm tra có cần backup không ────────────────────────────────────────────
 
-export function shouldBackup(profile: AgentProfile): boolean {
-  const stats = getSessionStats(profile);
+export function shouldBackup(worker: WorkerInstance): boolean {
+  const stats = getLogStats(worker);
   return (
     stats.messageCount >= BACKUP_THRESHOLD_MESSAGES ||
     stats.fileSizeBytes >= BACKUP_THRESHOLD_BYTES
   );
 }
 
-// ─── Chuyển Claude JSONL → danh sách Message ─────────────────────────────────
+// ─── Chuyển danh sách LogEntry → Markdown ────────────────────────────────────
 
-function parseClaudeSession(filePath: string): Message[] {
-  if (!fs.existsSync(filePath)) return [];
-  const lines = fs.readFileSync(filePath, 'utf-8').split('\n');
-  const messages: Message[] = [];
-
-  for (const line of lines) {
-    if (!line.trim()) continue;
-    try {
-      const entry = JSON.parse(line);
-      if (entry.type !== 'user' && entry.type !== 'assistant') continue;
-      if (!entry.message) continue;
-
-      const role = entry.message.role as 'user' | 'assistant';
-      const msgContent = entry.message.content;
-      let content = '';
-
-      if (typeof msgContent === 'string') {
-        content = msgContent;
-      } else if (Array.isArray(msgContent)) {
-        content = msgContent
-          .filter((c: { type: string }) => c.type === 'text')
-          .map((c: { text: string }) => c.text)
-          .join('\n');
-      }
-
-      if (content.trim()) {
-        messages.push({
-          role,
-          content: content.trim(),
-          ts: entry.timestamp ?? new Date().toISOString(),
-        });
-      }
-    } catch { /* bỏ qua dòng lỗi */ }
-  }
-  return messages;
-}
-
-// ─── Chuyển danh sách Message → Markdown ─────────────────────────────────────
-
-function messagesToMarkdown(profile: AgentProfile, messages: Message[]): string {
-  const stats = getSessionStats(profile);
+function logEntriesToMarkdown(worker: WorkerInstance, agent: AgentInstance, messages: LogEntry[]): string {
+  const stats = getLogStats(worker);
   const now = vnDatetime(new Date());
 
-  let md = `# Backup: ${profile.name} | ${profile.sessionId.substring(0, 8)} | ${now.replace('_', ' ').replace('-', ':')}\n`;
-  md += `> Agent: **${profile.name}** | CLI: **${profile.cli}** | Số tin nhắn: **${stats.messageCount}**\n\n`;
+  let md = `# Backup: ${worker.name} | ${worker.id.substring(0, 8)} | ${now.replace('_', ' ')}\n`;
+  md += `> Worker: **${worker.name}** | Agent: **${agent.name}** (${agent.type}) | Số tin nhắn: **${stats.messageCount}**\n\n`;
   md += `---\n\n`;
 
   messages.forEach((msg, i) => {
-    const time = new Date(msg.ts).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
-    const label = msg.role === 'user' ? '👤 User' : '🤖 Assistant';
+    const time = new Date(msg.timestamp).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+    const label = msg.role === 'user' ? 'User' : 'Assistant';
     md += `## [${i + 1}] ${label} — ${time}\n\n`;
     md += `${msg.content}\n\n`;
     md += `---\n\n`;
@@ -119,32 +78,17 @@ function messagesToMarkdown(profile: AgentProfile, messages: Message[]): string 
 
 // ─── Thực hiện backup ────────────────────────────────────────────────────────
 
-export function backupSession(profile: AgentProfile): string {
-  // Đảm bảo thư mục tồn tại
+export function backupSession(worker: WorkerInstance, agent: AgentInstance): string {
   if (!fs.existsSync(BACKUP_DIR)) {
     fs.mkdirSync(BACKUP_DIR, { recursive: true });
   }
 
-  // Lấy messages theo từng loại CLI
-  let messages: Message[];
-  if (profile.cli === 'claude') {
-    const sessionFile = getClaudeSessionPath(profile);
-    messages = parseClaudeSession(sessionFile);
-  } else {
-    const historyFile = getGeminiHistoryPath(profile);
-    if (!fs.existsSync(historyFile)) return '';
-    const lines = fs.readFileSync(historyFile, 'utf-8').split('\n');
-    messages = lines
-      .filter(l => l.trim())
-      .map(l => JSON.parse(l) as Message);
-  }
-
+  const messages = worker.conversationLog;
   if (messages.length === 0) return '';
 
-  // Tạo file backup
-  const filename = buildFilename(profile);
+  const filename = buildFilename(worker);
   const filePath = path.join(BACKUP_DIR, filename);
-  const markdown = messagesToMarkdown(profile, messages);
+  const markdown = logEntriesToMarkdown(worker, agent, messages);
   fs.writeFileSync(filePath, markdown, 'utf-8');
 
   return filePath;
@@ -160,7 +104,6 @@ export function listBackups(): BackupFile[] {
     .map(f => {
       const filePath = path.join(BACKUP_DIR, f);
       const stat = fs.statSync(filePath);
-      // Tên file: agentName_sessionId_datetime.md
       const agentName = f.split('_')[0];
       return {
         filename: f,
@@ -170,7 +113,7 @@ export function listBackups(): BackupFile[] {
         filePath,
       };
     })
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt)); // Mới nhất lên đầu
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export function readBackup(filename: string): string {

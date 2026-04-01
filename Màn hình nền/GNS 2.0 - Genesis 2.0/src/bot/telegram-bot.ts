@@ -1,44 +1,37 @@
 import { Telegraf } from 'telegraf';
 import { randomUUID } from 'crypto';
-import { saveAgent, assertCliAvailable } from '../lib/config.js';
-import { claudeSessionExists, clearGeminiHistory, getSessionStats } from '../lib/session.js';
+import bcrypt from 'bcryptjs';
+import { saveWorker, saveAiAgent } from '../lib/config.js';
+import { claudeSessionExists, appendToLog, clearLog, getLogStats } from '../lib/session.js';
 import { shouldBackup, backupSession } from '../lib/backup.js';
 import { log, logError } from '../lib/logger.js';
 import { callAI } from './adapters.js';
-import type { AgentProfile } from '../lib/config.js';
+import type { AgentInstance, WorkerInstance } from '../lib/config.js';
 
 // Telegram giới hạn 1 tin nhắn tối đa 4096 ký tự
 const TG_MAX_LENGTH = 4096;
 
 export class TelegramBotService {
   private bot: Telegraf;
-  private profile: AgentProfile;
+  private worker: WorkerInstance;
+  private agent: AgentInstance;
   private isNewSession: boolean = false;
-  private messageCount: number = 0;
   private running: boolean = false;
+  private awaitingPin: boolean = false;
 
-  constructor(profile: AgentProfile) {
-    // Kiểm tra CLI có sẵn không trước khi khởi động
-    assertCliAvailable(profile.cli);
+  constructor(worker: WorkerInstance, agent: AgentInstance) {
+    this.worker = worker;
+    this.agent = agent;
+    this.bot = new Telegraf(worker.botToken);
 
-    this.profile = profile;
-    this.bot = new Telegraf(profile.botToken);
-
-    // Đảm bảo có sessionId
-    if (!this.profile.sessionId) {
-      this.profile.sessionId = randomUUID();
-      saveAgent(this.profile);
-    }
-
-    // Xác định session mới hay resume
-    if (profile.cli === 'claude') {
-      this.isNewSession = !claudeSessionExists(profile);
-      log(profile.name, `Claude session ${profile.sessionId} — ${this.isNewSession ? 'MỚI' : 'RESUME'}`);
+    // Xác định session mới hay resume cho Claude
+    if (agent.type === 'claude-cli') {
+      this.isNewSession = !claudeSessionExists(agent);
+      log(worker.name, `Claude session ${agent.sessionId} — ${this.isNewSession ? 'MỚI' : 'RESUME'}`);
     } else {
-      // Gemini: luôn dùng history file, không phân biệt new/resume
       this.isNewSession = false;
-      const stats = getSessionStats(profile);
-      log(profile.name, `Gemini session ${profile.sessionId} — ${stats.messageCount} tin nhắn trong lịch sử`);
+      const stats = getLogStats(worker);
+      log(worker.name, `Gemini — ${stats.messageCount} tin nhắn trong conversationLog`);
     }
 
     this.registerHandlers();
@@ -47,129 +40,149 @@ export class TelegramBotService {
   // ─── Đăng ký các handler xử lý tin nhắn ───────────────────────────────────
 
   private registerHandlers() {
-    const { name, allowedUsers } = this.profile;
+    const { allowedUsers, name } = this.worker;
 
     this.bot.on('message', async (ctx) => {
       const userId = ctx.from?.id;
 
-      // Chặn user không được phép
       if (!userId || !allowedUsers.includes(userId)) return;
 
       const msg = ctx.message;
       if (!('text' in msg)) return;
       const text = msg.text.trim();
 
+      // ── PIN flow ─────────────────────────────────────────────────────────
+      if (this.awaitingPin) {
+        this.awaitingPin = false;
+        const correct = await bcrypt.compare(text, this.worker.sessionPin);
+        if (!correct) {
+          await ctx.reply('PIN không đúng. Thử lại với /clearhistory');
+          return;
+        }
+
+        // Backup trước khi xoá
+        const stats = getLogStats(this.worker);
+        if (stats.messageCount > 0) {
+          try { backupSession(this.worker, this.agent); } catch { /* ignore */ }
+        }
+
+        // Clear log
+        clearLog(this.worker);
+
+        // Nếu là Claude: tạo sessionId mới
+        if (this.agent.type === 'claude-cli') {
+          this.agent.sessionId = randomUUID();
+          saveAiAgent(this.agent);
+          this.isNewSession = true;
+        }
+
+        saveWorker(this.worker);
+        await ctx.reply('Đã xoá lịch sử. Cuộc trò chuyện tiếp theo bắt đầu mới hoàn toàn.');
+        log(name, 'Lịch sử đã được xoá bởi /clearhistory');
+        return;
+      }
+
       // ── Xử lý các lệnh ──────────────────────────────────────────────────
 
       if (text === '/help') {
         await ctx.reply(
-          `📋 Danh sách lệnh:\n` +
-          `/new — Bắt đầu cuộc trò chuyện mới (xoá lịch sử cũ)\n` +
-          `/status — Xem trạng thái hiện tại\n` +
-          `/backup — Backup lịch sử ngay lập tức\n` +
-          `/help — Danh sách lệnh này`
+          'Danh sách lệnh:\n' +
+          '/clearhistory — Xoá lịch sử (cần xác nhận PIN)\n' +
+          '/status — Xem trạng thái hiện tại\n' +
+          '/backup — Backup lịch sử ngay lập tức\n' +
+          '/help — Danh sách lệnh này'
         );
         return;
       }
 
       if (text === '/status') {
-        const stats = getSessionStats(this.profile);
+        const stats = getLogStats(this.worker);
         await ctx.reply(
-          `📊 Trạng thái:\n` +
-          `Agent: ${name}\n` +
-          `CLI: ${this.profile.cli}\n` +
-          `Session ID: ${this.profile.sessionId.substring(0, 8)}...\n` +
+          `Trạng thái:\n` +
+          `Worker: ${name}\n` +
+          `Agent: ${this.agent.name} (${this.agent.type})\n` +
+          `Session ID: ${this.agent.sessionId.substring(0, 8)}...\n` +
           `Tin nhắn: ${stats.messageCount}\n` +
-          `Kích thước: ${(stats.fileSizeBytes / 1024).toFixed(1)} KB\n` +
-          `Backup tự động khi: > 80 tin hoặc > 500 KB`
+          `Kích thước log: ${(stats.fileSizeBytes / 1024).toFixed(1)} KB`
         );
         return;
       }
 
       if (text === '/backup') {
-        await ctx.reply('⏳ Đang backup...');
+        await ctx.reply('Đang backup...');
         try {
-          const filePath = backupSession(this.profile);
+          const filePath = backupSession(this.worker, this.agent);
           if (filePath) {
-            await ctx.reply(`✅ Backup xong!\nFile: ${filePath.split('/').pop()}`);
+            await ctx.reply(`Backup xong!\nFile: ${filePath.split('/').pop()}`);
           } else {
-            await ctx.reply('ℹ️ Chưa có tin nhắn nào để backup.');
+            await ctx.reply('Chưa có tin nhắn nào để backup.');
           }
         } catch (err) {
-          await ctx.reply(`❌ Backup lỗi: ${err instanceof Error ? err.message : err}`);
+          await ctx.reply(`Backup lỗi: ${err instanceof Error ? err.message : err}`);
         }
         return;
       }
 
-      if (text === '/new') {
-        // Backup trước khi reset nếu có dữ liệu
-        const stats = getSessionStats(this.profile);
-        if (stats.messageCount > 0) {
-          try {
-            backupSession(this.profile);
-          } catch { /* không cần báo lỗi backup khi /new */ }
-        }
-
-        // Reset session
-        this.profile.sessionId = randomUUID();
-        saveAgent(this.profile);
-        this.isNewSession = true;
-        this.messageCount = 0;
-
-        // Xoá history file của Gemini nếu dùng Gemini
-        if (this.profile.cli === 'gemini') {
-          clearGeminiHistory(this.profile);
-        }
-
-        await ctx.reply('🔄 Đã reset! Cuộc trò chuyện tiếp theo sẽ bắt đầu mới hoàn toàn.');
-        log(name, 'Session reset bởi /new');
+      if (text === '/clearhistory') {
+        this.awaitingPin = true;
+        await ctx.reply('Nhập PIN để xác nhận xoá lịch sử:');
         return;
       }
 
       // Bỏ qua các lệnh khác không nhận dạng được
       if (text.startsWith('/')) return;
 
-      // ── Xử lý tin nhắn thường ───────────────────────────────────────────
+      // ── Kiểm tra backup tự động ──────────────────────────────────────────
 
-      // Kiểm tra có cần backup không trước khi xử lý
-      if (shouldBackup(this.profile)) {
-        log(name, 'Session sắp đầy — tự động backup và tạo session mới');
+      if (shouldBackup(this.worker)) {
+        log(name, 'ConversationLog sắp đầy — tự động backup và tạo session mới');
         try {
-          backupSession(this.profile);
-          await ctx.reply('💾 Session đã đầy, đã backup và bắt đầu session mới tự động.');
+          backupSession(this.worker, this.agent);
+          await ctx.reply('Session đã đầy, đã backup và bắt đầu session mới tự động.');
         } catch (err) {
           logError(name, `Auto backup lỗi: ${err}`);
         }
-        // Tạo session mới sau backup
-        this.profile.sessionId = randomUUID();
-        saveAgent(this.profile);
-        this.isNewSession = true;
-        if (this.profile.cli === 'gemini') clearGeminiHistory(this.profile);
+        clearLog(this.worker);
+        if (this.agent.type === 'claude-cli') {
+          this.agent.sessionId = randomUUID();
+          saveAiAgent(this.agent);
+          this.isNewSession = true;
+        }
+        saveWorker(this.worker);
       }
 
-      // Hiện trạng thái "đang gõ" trong lúc AI xử lý
+      // ── Xử lý tin nhắn thường ───────────────────────────────────────────
+
       const typingInterval = setInterval(() => {
         ctx.sendChatAction('typing').catch(() => {});
       }, 4000);
       ctx.sendChatAction('typing').catch(() => {});
 
-      log(name, `Tin nhắn #${this.messageCount + 1}: ${text.substring(0, 80)}${text.length > 80 ? '...' : ''}`);
+      const msgCount = getLogStats(this.worker).messageCount;
+      log(name, `Tin nhắn #${msgCount + 1}: ${text.substring(0, 80)}${text.length > 80 ? '...' : ''}`);
+
+      // Append user message trước khi gọi AI
+      appendToLog(this.worker, 'user', text, this.agent.id);
 
       try {
-        const response = await callAI(this.profile, text, this.isNewSession);
+        const response = await callAI(this.agent, this.worker, text, this.isNewSession);
 
         clearInterval(typingInterval);
         this.isNewSession = false;
-        this.messageCount++;
 
-        // Gửi response — tự cắt nếu quá dài
+        // Append assistant response
+        appendToLog(this.worker, 'assistant', response, this.agent.id);
+        saveWorker(this.worker);
+
         await this.sendLongMessage(ctx, response);
 
       } catch (err) {
         clearInterval(typingInterval);
+        // Remove the user message we appended if AI failed
+        this.worker.conversationLog.pop();
         const message = err instanceof Error ? err.message : String(err);
         logError(name, `Lỗi xử lý tin nhắn: ${message}`);
-        await ctx.reply(`❌ Lỗi: ${message}`);
+        await ctx.reply(`Lỗi: ${message}`);
       }
     });
 
@@ -181,11 +194,9 @@ export class TelegramBotService {
   // Gửi tin nhắn dài — cắt thành nhiều phần nếu vượt giới hạn Telegram
   private async sendLongMessage(ctx: any, text: string) {
     if (text.length <= TG_MAX_LENGTH) {
-      // Thử gửi với Markdown, nếu lỗi thì gửi plain text
       await ctx.reply(text, { parse_mode: 'Markdown' }).catch(() => ctx.reply(text));
       return;
     }
-    // Cắt thành từng đoạn 4000 ký tự
     for (let i = 0; i < text.length; i += 4000) {
       await ctx.reply(text.substring(i, i + 4000)).catch(() => {});
     }
@@ -196,14 +207,14 @@ export class TelegramBotService {
   start() {
     if (this.running) return;
     this.running = true;
-    log(this.profile.name, `Bot khởi động — CLI: ${this.profile.cli}`);
+    log(this.worker.name, `Bot khởi động — Agent: ${this.agent.name} (${this.agent.type})`);
     this.bot.launch();
   }
 
   async stop() {
     if (!this.running) return;
     this.running = false;
-    log(this.profile.name, 'Bot dừng lại');
+    log(this.worker.name, 'Bot dừng lại');
     this.bot.stop('SIGTERM');
   }
 
@@ -211,11 +222,15 @@ export class TelegramBotService {
     return this.running;
   }
 
-  getProfile() {
-    return this.profile;
+  getWorker() {
+    return this.worker;
+  }
+
+  getAgent() {
+    return this.agent;
   }
 
   getMessageCount() {
-    return this.messageCount;
+    return getLogStats(this.worker).messageCount;
   }
 }
