@@ -18,7 +18,7 @@
       --text: #1c1c1c;
       --text-2: #6b6b6b;
       --text-3: #a8a8a8;
-      --accent: #cc5500;
+      --accent: #d4612a;
       --accent-light: #fff3ec;
       --accent-hover: #b84a00;
       --green: #1a7a45;
@@ -38,7 +38,7 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    /* ── LOGIN ─────────────────────────────────────────────────────── */
+    /* LOGIN */
     #login-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
     .login-wrap { width: 320px; }
     .login-brand { text-align: center; margin-bottom: 28px; }
@@ -53,14 +53,15 @@
     .field { margin-bottom: 14px; }
     .field:last-of-type { margin-bottom: 0; }
     .field label { display: block; font-size: 11.5px; font-weight: 500; color: var(--text-2); margin-bottom: 5px; }
-    .field input, .field select {
+    .field input, .field select, .field textarea {
       width: 100%; padding: 9px 11px; border: 1px solid var(--border);
       border-radius: 7px; background: var(--bg); color: var(--text);
       font-size: 13px; font-family: inherit; outline: none;
       transition: border-color 0.15s, background 0.15s;
     }
-    .field input:focus, .field select:focus { border-color: #c0b8ae; background: var(--surface); }
-    .field input::placeholder { color: var(--text-3); }
+    .field textarea { resize: vertical; min-height: 70px; }
+    .field input:focus, .field select:focus, .field textarea:focus { border-color: #c0b8ae; background: var(--surface); }
+    .field input::placeholder, .field textarea::placeholder { color: var(--text-3); }
     .btn-login {
       width: 100%; margin-top: 16px; padding: 10px;
       background: var(--accent); color: #fff; border: none;
@@ -70,11 +71,11 @@
     .btn-login:hover { background: var(--accent-hover); }
     #login-error { font-size: 12px; color: var(--red); margin-top: 10px; text-align: center; min-height: 18px; }
 
-    /* ── LAYOUT ──────────────────────────────────────────────────── */
+    /* LAYOUT */
     #app { display: none; height: 100vh; flex-direction: row; }
     #app.visible { display: flex; }
 
-    /* ── SIDEBAR ─────────────────────────────────────────────────── */
+    /* SIDEBAR */
     aside {
       width: 200px; min-width: 200px; background: var(--sidebar-bg);
       border-right: 1px solid var(--border); display: flex; flex-direction: column;
@@ -101,7 +102,7 @@
     }
     .logout-btn:hover { color: var(--text); }
 
-    /* ── MAIN ────────────────────────────────────────────────────── */
+    /* MAIN */
     main { flex: 1; overflow-y: auto; background: var(--bg); }
     .page { display: none; padding: 32px 36px; max-width: 860px; }
     .page.active { display: block; }
@@ -110,7 +111,7 @@
     .page-title { font-size: 16px; font-weight: 600; letter-spacing: -0.3px; margin-bottom: 3px; }
     .page-sub { font-size: 12px; color: var(--text-3); }
 
-    /* ── BUTTONS ─────────────────────────────────────────────────── */
+    /* BUTTONS */
     .btn {
       padding: 6px 13px; border-radius: var(--radius-sm);
       border: 1px solid var(--border); background: var(--surface);
@@ -128,15 +129,10 @@
     .btn.view:hover { background: #dce8ff; }
     .btn.danger { background: var(--red-bg); border-color: #f0c0c0; color: var(--red); }
     .btn.danger:hover { background: #f8d8d8; }
-    .btn-icon {
-      width: 30px; height: 30px; border-radius: 7px; border: 1px solid var(--border);
-      background: var(--surface); color: var(--text-2); font-size: 16px; cursor: pointer;
-      display: flex; align-items: center; justify-content: center; transition: all 0.12s;
-      flex-shrink: 0;
-    }
-    .btn-icon:hover { background: var(--border-light); color: var(--text); }
+    .btn.swap { background: var(--accent-light); border-color: #f0c8b0; color: var(--accent); }
+    .btn.swap:hover { background: #fde8d8; }
 
-    /* ── BADGES ──────────────────────────────────────────────────── */
+    /* BADGES */
     .badge {
       display: inline-flex; align-items: center; gap: 4px;
       padding: 2px 7px; border-radius: 20px; font-size: 11px; font-weight: 500;
@@ -146,45 +142,34 @@
     .badge.running .dot { background: var(--green); }
     .badge.stopped { background: var(--border-light); color: var(--text-3); }
     .badge.stopped .dot { background: var(--text-3); }
-    .badge.claude { background: var(--accent-light); color: var(--accent); }
-    .badge.gemini { background: var(--blue-bg); color: var(--blue); }
+    .badge.claude-cli { background: var(--accent-light); color: var(--accent); }
+    .badge.gemini-cli { background: var(--blue-bg); color: var(--blue); }
 
-    /* ── CARDS ───────────────────────────────────────────────────── */
+    /* CARDS */
     .card {
       background: var(--surface); border: 1px solid var(--border);
       border-radius: var(--radius); padding: 16px 18px; margin-bottom: 8px;
     }
     .card:last-child { margin-bottom: 0; }
 
-    /* Agent card */
     .agent-row { display: flex; align-items: center; gap: 14px; }
     .agent-avatar {
       width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
       border: 1px solid var(--border-light);
     }
-    .agent-avatar.claude { background: var(--accent-light); }
-    .agent-avatar.gemini { background: var(--blue-bg); }
+    .agent-avatar.claude-cli { background: var(--accent-light); }
+    .agent-avatar.gemini-cli { background: var(--blue-bg); }
     .agent-body { flex: 1; min-width: 0; }
     .agent-name { font-size: 13.5px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
-    .agent-meta { font-size: 11.5px; color: var(--text-3); display: flex; align-items: center; gap: 0; }
+    .agent-meta { font-size: 11.5px; color: var(--text-3); display: flex; align-items: center; gap: 0; flex-wrap: wrap; }
     .meta-sep { margin: 0 6px; opacity: 0.4; }
-    .progress-track { height: 2px; background: var(--border-light); border-radius: 2px; margin-top: 9px; overflow: hidden; }
-    .progress-fill { height: 100%; background: var(--accent); border-radius: 2px; opacity: 0.6; transition: width 0.4s; }
-    .agent-side { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
+    .agent-side { display: flex; align-items: center; gap: 7px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
 
-    /* Stats */
-    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
-    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
-    .stat-label { font-size: 10.5px; font-weight: 500; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 7px; }
-    .stat-value { font-size: 24px; font-weight: 600; letter-spacing: -0.5px; line-height: 1; }
-
-    /* Session card */
-    .session-head { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
-    .session-name { font-size: 13.5px; font-weight: 600; }
-    .session-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; }
-    .session-stat .s-label { font-size: 11px; color: var(--text-3); margin-bottom: 3px; }
-    .session-stat .s-value { font-size: 14px; font-weight: 600; }
+    /* Worker card */
+    .worker-card-body { flex: 1; min-width: 0; }
+    .worker-name { font-size: 13.5px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
+    .worker-meta { font-size: 11.5px; color: var(--text-3); }
 
     /* Backup */
     .backup-row { display: flex; align-items: center; gap: 12px; }
@@ -210,7 +195,7 @@
     .log-line { color: var(--text-2); }
     .log-line.error { color: var(--red); }
 
-    /* ── MODAL ───────────────────────────────────────────────────── */
+    /* MODAL */
     .modal-overlay {
       display: none; position: fixed; inset: 0;
       background: rgba(0,0,0,0.28); align-items: center; justify-content: center;
@@ -219,13 +204,13 @@
     .modal-overlay.open { display: flex; }
     .modal {
       background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
-      width: 440px; max-width: 94vw;
+      width: 480px; max-width: 94vw; max-height: 90vh; overflow-y: auto;
       box-shadow: 0 8px 40px rgba(0,0,0,0.14);
       display: flex; flex-direction: column;
     }
     .modal-head {
       padding: 18px 20px 16px; border-bottom: 1px solid var(--border);
-      display: flex; align-items: center;
+      display: flex; align-items: center; position: sticky; top: 0; background: var(--surface); z-index: 1;
     }
     .modal-title { flex: 1; font-size: 14px; font-weight: 600; }
     .modal-close {
@@ -238,6 +223,7 @@
     .modal-footer {
       padding: 14px 20px; border-top: 1px solid var(--border);
       display: flex; justify-content: flex-end; gap: 8px;
+      position: sticky; bottom: 0; background: var(--surface);
     }
 
     /* CLI cards */
@@ -260,17 +246,33 @@
     .cli-status.ok { background: var(--green-bg); color: var(--green); }
     .cli-status.missing { background: var(--border-light); color: var(--text-3); }
 
+    /* Agent radio list */
+    .agent-radio-list { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+    .agent-radio-item {
+      border: 1.5px solid var(--border); border-radius: 9px; padding: 12px 14px;
+      cursor: pointer; transition: all 0.15s; user-select: none;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .agent-radio-item:hover { border-color: #c0b8ae; background: var(--bg); }
+    .agent-radio-item.selected { border-color: var(--accent); background: var(--accent-light); }
+    .agent-radio-dot {
+      width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--border);
+      flex-shrink: 0; transition: all 0.15s;
+    }
+    .agent-radio-item.selected .agent-radio-dot { border-color: var(--accent); background: var(--accent); }
+    .agent-radio-name { font-size: 13px; font-weight: 600; flex: 1; }
+    .agent-radio-sub { font-size: 11.5px; color: var(--text-3); }
+
     .hint { font-size: 11.5px; color: var(--text-3); margin-top: 6px; line-height: 1.6; }
     .hint code { font-family: monospace; background: var(--bg); padding: 1px 5px; border-radius: 4px; font-size: 11px; }
 
-    /* Spinner */
     .spinner {
       display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border);
       border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* Viewer */
+    /* Backup viewer */
     #backup-viewer {
       display: none; position: fixed; inset: 0;
       background: rgba(0,0,0,0.28); align-items: center; justify-content: center;
@@ -334,13 +336,13 @@
       <div class="sidebar-tagline">Agent Manager</div>
     </div>
     <nav>
-      <div class="nav-item active" onclick="showPage('agents',this)">
+      <div class="nav-item active" onclick="showPage('ai-agents',this)">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="5.5" r="2.5"/><path d="M2.5 14c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/></svg>
-        Agents
+        AI Agents
       </div>
-      <div class="nav-item" onclick="showPage('sessions',this)">
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13 2H3a1 1 0 00-1 1v8a1 1 0 001 1h3l2 2 2-2h3a1 1 0 001-1V3a1 1 0 00-1-1z"/></svg>
-        Sessions
+      <div class="nav-item" onclick="showPage('workers',this)">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="3" width="12" height="10" rx="2"/><path d="M5 7h6M5 10h4"/></svg>
+        Workers
       </div>
       <div class="nav-item" onclick="showPage('backups',this)">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 10v2a2 2 0 01-2 2H4a2 2 0 01-2-2v-2"/><polyline points="11 7 8 10 5 7"/><line x1="8" y1="2" x2="8" y2="10"/></svg>
@@ -360,31 +362,31 @@
   </aside>
 
   <main>
-    <!-- AGENTS -->
-    <div id="page-agents" class="page active">
+    <!-- AI AGENTS PAGE -->
+    <div id="page-ai-agents" class="page active">
       <div class="page-header">
         <div class="page-header-left">
-          <div class="page-title">Agents</div>
-          <div class="page-sub">Quản lý và điều khiển các AI agent</div>
+          <div class="page-title">AI Agents</div>
+          <div class="page-sub">Pool các AI instance dùng chung cho Workers</div>
         </div>
         <button class="btn primary" onclick="openNewAgent()" style="margin-top:2px">+ New Agent</button>
       </div>
-      <div id="agents-list"><div class="empty">Đang tải...</div></div>
+      <div id="ai-agents-list"><div class="empty">Đang tải...</div></div>
     </div>
 
-    <!-- SESSIONS -->
-    <div id="page-sessions" class="page">
+    <!-- WORKERS PAGE -->
+    <div id="page-workers" class="page">
       <div class="page-header">
         <div class="page-header-left">
-          <div class="page-title">Sessions</div>
-          <div class="page-sub">Trạng thái bộ nhớ hiện tại của từng agent</div>
+          <div class="page-title">Workers</div>
+          <div class="page-sub">Telegram bot workers — mỗi worker dùng 1 AI Agent</div>
         </div>
+        <button class="btn primary" onclick="openNewWorker()" style="margin-top:2px">+ New Worker</button>
       </div>
-      <div class="stats-grid" id="session-stats"></div>
-      <div id="sessions-list"></div>
+      <div id="workers-list"><div class="empty">Đang tải...</div></div>
     </div>
 
-    <!-- BACKUPS -->
+    <!-- BACKUPS PAGE -->
     <div id="page-backups" class="page">
       <div class="page-header">
         <div class="page-header-left">
@@ -395,7 +397,7 @@
       <div id="backups-list"><div class="empty">Đang tải...</div></div>
     </div>
 
-    <!-- LOGS -->
+    <!-- LOGS PAGE -->
     <div id="page-logs" class="page">
       <div class="page-header">
         <div class="page-header-left">
@@ -404,29 +406,27 @@
         </div>
       </div>
       <div class="log-selector">
-        <select id="log-select" onchange="loadLogs()"><option value="">Chọn agent...</option></select>
+        <select id="log-select" onchange="loadLogs()"><option value="">Chọn worker...</option></select>
       </div>
-      <div class="log-box" id="log-box"><div class="empty">Chọn agent để xem log</div></div>
+      <div class="log-box" id="log-box"><div class="empty">Chọn worker để xem log</div></div>
     </div>
   </main>
 </div>
 
-<!-- NEW AGENT MODAL -->
+<!-- NEW AI AGENT MODAL -->
 <div class="modal-overlay" id="modal-new-agent">
   <div class="modal">
     <div class="modal-head">
-      <div class="modal-title">Tạo Agent mới</div>
-      <button class="modal-close" onclick="closeNewAgent()">✕</button>
+      <div class="modal-title">Tạo AI Agent mới</div>
+      <button class="modal-close" onclick="closeNewAgent()">&#x2715;</button>
     </div>
     <div class="modal-body">
-
-      <div id="cli-detect-state">
+      <div id="agent-cli-detect-state">
         <div style="display:flex;align-items:center;gap:8px;color:var(--text-2);font-size:13px">
           <span class="spinner"></span> Đang quét CLI trên hệ thống...
         </div>
       </div>
-
-      <div id="cli-none-state" style="display:none">
+      <div id="agent-cli-none-state" style="display:none">
         <div class="empty" style="padding:16px 0">
           Không tìm thấy CLI nào.<br>
           Cài ít nhất một trong hai trước:<br>
@@ -434,37 +434,87 @@
           <code>npm i -g @google/gemini-cli</code>
         </div>
       </div>
-
       <div id="agent-form" style="display:none">
         <div class="field">
-          <label>Tên agent <span style="color:var(--text-3);font-weight:400">(chỉ dùng a-z, 0-9, -, _)</span></label>
-          <input type="text" id="new-name" placeholder="my-agent" />
+          <label>Tên Agent <span style="color:var(--text-3);font-weight:400">(tùy ý)</span></label>
+          <input type="text" id="new-agent-name" placeholder="My Claude Agent" />
         </div>
-
         <div class="field">
-          <label>AI CLI</label>
-          <div class="cli-cards" id="cli-cards"></div>
-          <input type="hidden" id="new-cli" />
+          <label>Loại AI CLI</label>
+          <div class="cli-cards" id="agent-cli-cards"></div>
+          <input type="hidden" id="new-agent-type" />
         </div>
-
-        <div class="field">
-          <label>Telegram Bot Token <span style="color:var(--text-3);font-weight:400">(từ @BotFather)</span></label>
-          <input type="text" id="new-token" placeholder="123456:ABC-..." />
-        </div>
-
-        <div class="field">
-          <label>Telegram User ID được phép nhắn <span style="color:var(--text-3);font-weight:400">(cách nhau bằng dấu phẩy)</span></label>
-          <input type="text" id="new-users" placeholder="6597520958" />
-          <div class="hint">Tìm ID của bạn: nhắn <code>/start</code> cho <code>@userinfobot</code> trên Telegram</div>
-        </div>
-
-        <div class="form-error" id="form-error"></div>
+        <div class="form-error" id="agent-form-error"></div>
       </div>
-
     </div>
-    <div class="modal-footer" id="modal-footer" style="display:none">
+    <div class="modal-footer" id="agent-modal-footer" style="display:none">
       <button class="btn" onclick="closeNewAgent()">Huỷ</button>
-      <button class="btn primary" onclick="submitNewAgent()" id="btn-create">Tạo Agent</button>
+      <button class="btn primary" onclick="submitNewAgent()" id="btn-create-agent">Tạo Agent</button>
+    </div>
+  </div>
+</div>
+
+<!-- NEW WORKER MODAL -->
+<div class="modal-overlay" id="modal-new-worker">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">Tạo Worker mới</div>
+      <button class="modal-close" onclick="closeNewWorker()">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Tên Worker</label>
+        <input type="text" id="new-worker-name" placeholder="My Bot" />
+      </div>
+      <div class="field">
+        <label>Telegram Bot Token <span style="color:var(--text-3);font-weight:400">(từ @BotFather)</span></label>
+        <input type="text" id="new-worker-token" placeholder="123456:ABC-..." />
+      </div>
+      <div class="field">
+        <label>Allowed User IDs <span style="color:var(--text-3);font-weight:400">(phân cách bằng dấu phẩy)</span></label>
+        <input type="text" id="new-worker-users" placeholder="6597520958" />
+        <div class="hint">Tìm ID: nhắn <code>/start</code> cho <code>@userinfobot</code></div>
+      </div>
+      <div class="field">
+        <label>System Prompt <span style="color:var(--text-3);font-weight:400">(tùy chọn)</span></label>
+        <textarea id="new-worker-prompt" placeholder="Bạn là một trợ lý hữu ích..."></textarea>
+      </div>
+      <div class="field">
+        <label>PIN <span style="color:var(--text-3);font-weight:400">(dùng cho /clearhistory)</span></label>
+        <input type="password" id="new-worker-pin" placeholder="Ít nhất 4 ký tự" />
+      </div>
+      <div class="field">
+        <label>AI Agent</label>
+        <div id="worker-agent-list" class="agent-radio-list"></div>
+        <input type="hidden" id="new-worker-agent-id" />
+      </div>
+      <div class="form-error" id="worker-form-error"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeNewWorker()">Huỷ</button>
+      <button class="btn primary" onclick="submitNewWorker()" id="btn-create-worker">Tạo Worker</button>
+    </div>
+  </div>
+</div>
+
+<!-- SWAP AGENT MODAL -->
+<div class="modal-overlay" id="modal-swap-agent">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">Swap AI Agent</div>
+      <button class="modal-close" onclick="closeSwapModal()">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12.5px;color:var(--text-2);margin-bottom:14px">
+        Chọn AI Agent mới cho worker <strong id="swap-worker-name"></strong>.<br>
+        <span style="color:var(--text-3)">Hệ thống sẽ tạo handoff summary trước khi swap.</span>
+      </p>
+      <div id="swap-agent-list" class="agent-radio-list"></div>
+      <div class="form-error" id="swap-form-error"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeSwapModal()">Huỷ</button>
+      <button class="btn primary" onclick="submitSwap()" id="btn-swap">Swap Agent</button>
     </div>
   </div>
 </div>
@@ -474,7 +524,7 @@
   <div class="viewer-box">
     <div class="viewer-head">
       <span id="viewer-title"></span>
-      <button class="viewer-close" onclick="closeViewer()">✕</button>
+      <button class="viewer-close" onclick="closeViewer()">&#x2715;</button>
     </div>
     <div class="viewer-body" id="viewer-body"></div>
   </div>
@@ -482,7 +532,7 @@
 
 <script>
   let TOKEN = localStorage.getItem('gns_token') || '';
-  const API = window.location.port === '8823' ? '' : 'http://localhost:8823';
+  const API = '';
 
   // ── Auth ─────────────────────────────────────────────────────────────────────
   async function login() {
@@ -519,7 +569,7 @@
   function showApp() {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app').classList.add('visible');
-    loadAgents();
+    loadAiAgents();
   }
 
   function showPage(name, el) {
@@ -527,110 +577,100 @@
     el.classList.add('active');
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById(`page-${name}`).classList.add('active');
-    if (name==='agents') loadAgents();
-    if (name==='sessions') loadSessions();
-    if (name==='backups') loadBackups();
-    if (name==='logs') populateLogSelect();
+    if (name === 'ai-agents') loadAiAgents();
+    if (name === 'workers') loadWorkers();
+    if (name === 'backups') loadBackups();
+    if (name === 'logs') populateLogSelect();
   }
 
-  // ── Agents ───────────────────────────────────────────────────────────────────
-  function cliIcon(cli) {
-    if (cli==='claude') return `<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#cc5500" stroke-width="1.5"><circle cx="8" cy="8" r="5.5"/><path d="M5.5 9c.4-1.1 1.3-1.8 2.5-1.8s2.1.7 2.5 1.8"/><circle cx="8" cy="11.2" r=".6" fill="#cc5500" stroke="none"/></svg>`;
+  // ── AI Agents ─────────────────────────────────────────────────────────────────
+  function typeIcon(type) {
+    if (type === 'claude-cli') return `<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#d4612a" stroke-width="1.5"><circle cx="8" cy="8" r="5.5"/><path d="M5.5 9c.4-1.1 1.3-1.8 2.5-1.8s2.1.7 2.5 1.8"/><circle cx="8" cy="11.2" r=".6" fill="#d4612a" stroke="none"/></svg>`;
     return `<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#2255cc" stroke-width="1.5"><polygon points="8,2.5 13.5,12.5 2.5,12.5"/></svg>`;
   }
 
-  async function loadAgents() {
-    const agents = await api('/api/agents');
-    const el = document.getElementById('agents-list');
+  async function loadAiAgents() {
+    const agents = await api('/api/ai-agents');
+    const el = document.getElementById('ai-agents-list');
     if (!agents || !agents.length) {
-      el.innerHTML = '<div class="empty">Chưa có agent nào.<br>Nhấn <strong>+ New Agent</strong> để bắt đầu.</div>';
+      el.innerHTML = '<div class="empty">Chưa có AI Agent nào.<br>Nhấn <strong>+ New Agent</strong> để tạo.</div>';
       return;
     }
-    el.innerHTML = agents.map(a => {
-      const pct = Math.min(100, (a.sessionStats.messageCount / 80 * 100)).toFixed(0);
-      return `<div class="card">
+    el.innerHTML = agents.map(a => `
+      <div class="card">
         <div class="agent-row">
-          <div class="agent-avatar ${a.cli}">${cliIcon(a.cli)}</div>
+          <div class="agent-avatar ${a.type}">${typeIcon(a.type)}</div>
           <div class="agent-body">
             <div class="agent-name">${escHtml(a.name)}</div>
             <div class="agent-meta">
-              <span>${a.sessionId.substring(0,8)}…</span>
+              <span class="badge ${a.type}">${a.type}</span>
               <span class="meta-sep">·</span>
-              <span>${a.sessionStats.messageCount} msgs</span>
+              <span style="font-family:monospace;font-size:11px">${a.id.substring(0,8)}…</span>
               <span class="meta-sep">·</span>
-              <span>${(a.sessionStats.fileSizeBytes/1024).toFixed(1)} KB</span>
+              <span>Session: ${a.sessionId.substring(0,8)}…</span>
             </div>
-            <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
           </div>
           <div class="agent-side">
-            <span class="badge ${a.cli}">${a.cli}</span>
-            <span class="badge ${a.running?'running':'stopped'}">
-              <span class="dot"></span>${a.running?'Running':'Stopped'}
-            </span>
-            ${a.running
-              ? `<button class="btn stop" onclick="stopAgent('${escHtml(a.name)}')">Stop</button>`
-              : `<button class="btn start" onclick="startAgent('${escHtml(a.name)}')">Start</button>`}
+            <button class="btn danger" onclick="deleteAiAgent('${escHtml(a.id)}', '${escHtml(a.name)}')">Xoá</button>
           </div>
         </div>
-      </div>`;
-    }).join('');
+      </div>
+    `).join('');
   }
 
-  async function startAgent(name) { await api(`/api/agents/start/${name}`,{method:'POST'}); loadAgents(); }
-  async function stopAgent(name) { await api(`/api/agents/stop/${name}`,{method:'POST'}); loadAgents(); }
+  async function deleteAiAgent(id, name) {
+    if (!confirm(`Xoá AI Agent "${name}"?`)) return;
+    await api(`/api/ai-agents/${id}`, { method: 'DELETE' });
+    loadAiAgents();
+  }
 
-  // ── New Agent Modal ──────────────────────────────────────────────────────────
-  let selectedCli = '';
+  // New AI Agent modal
+  let selectedAgentType = '';
 
   async function openNewAgent() {
-    selectedCli = '';
-    document.getElementById('new-name').value = '';
-    document.getElementById('new-cli').value = '';
-    document.getElementById('new-token').value = '';
-    document.getElementById('new-users').value = '';
-    document.getElementById('form-error').textContent = '';
-    document.getElementById('cli-detect-state').style.display = 'flex';
-    document.getElementById('cli-none-state').style.display = 'none';
+    selectedAgentType = '';
+    document.getElementById('new-agent-name').value = '';
+    document.getElementById('new-agent-type').value = '';
+    document.getElementById('agent-form-error').textContent = '';
+    document.getElementById('agent-cli-detect-state').style.display = 'flex';
+    document.getElementById('agent-cli-none-state').style.display = 'none';
     document.getElementById('agent-form').style.display = 'none';
-    document.getElementById('modal-footer').style.display = 'none';
+    document.getElementById('agent-modal-footer').style.display = 'none';
     document.getElementById('modal-new-agent').classList.add('open');
 
-    // Quét CLI
     const clis = await api('/api/system/clis');
-    document.getElementById('cli-detect-state').style.display = 'none';
+    document.getElementById('agent-cli-detect-state').style.display = 'none';
 
     if (!clis || (!clis.claude && !clis.gemini)) {
-      document.getElementById('cli-none-state').style.display = 'block';
+      document.getElementById('agent-cli-none-state').style.display = 'block';
       return;
     }
 
-    // Build CLI cards
     const cards = [
-      { id:'claude', name:'Claude Code', sub:'Anthropic CLI', cls:'claude-card', available: clis.claude },
-      { id:'gemini', name:'Gemini CLI', sub:'Google CLI', cls:'gemini-card', available: clis.gemini },
+      { id:'claude-cli', name:'Claude Code', sub:'Anthropic CLI', cls:'claude-card', available: clis.claude },
+      { id:'gemini-cli', name:'Gemini CLI', sub:'Google CLI', cls:'gemini-card', available: clis.gemini },
     ];
-    document.getElementById('cli-cards').innerHTML = cards.map(c => `
-      <div class="cli-card ${c.cls} ${!c.available?'disabled':''}" id="cli-card-${c.id}"
-           onclick="${c.available?`selectCli('${c.id}')`:''}" >
-        <span class="cli-status ${c.available?'ok':'missing'}">${c.available?'✓ Có sẵn':'Chưa cài'}</span>
+    document.getElementById('agent-cli-cards').innerHTML = cards.map(c => `
+      <div class="cli-card ${c.cls} ${!c.available?'disabled':''}" id="agent-cli-card-${c.id}"
+           onclick="${c.available?`selectAgentType('${c.id}')`:''}" >
+        <span class="cli-status ${c.available?'ok':'missing'}">${c.available?'Có san':'Chua cai'}</span>
         <div class="cli-card-name">${c.name}</div>
         <div class="cli-card-sub">${c.sub}</div>
       </div>
     `).join('');
 
-    // Auto-select nếu chỉ có 1 CLI
-    if (clis.claude && !clis.gemini) selectCli('claude');
-    else if (!clis.claude && clis.gemini) selectCli('gemini');
+    if (clis.claude && !clis.gemini) selectAgentType('claude-cli');
+    else if (!clis.claude && clis.gemini) selectAgentType('gemini-cli');
 
     document.getElementById('agent-form').style.display = 'block';
-    document.getElementById('modal-footer').style.display = 'flex';
+    document.getElementById('agent-modal-footer').style.display = 'flex';
   }
 
-  function selectCli(cli) {
-    selectedCli = cli;
-    document.getElementById('new-cli').value = cli;
+  function selectAgentType(type) {
+    selectedAgentType = type;
+    document.getElementById('new-agent-type').value = type;
     document.querySelectorAll('.cli-card').forEach(c => c.classList.remove('selected'));
-    const card = document.getElementById(`cli-card-${cli}`);
+    const card = document.getElementById(`agent-cli-card-${type}`);
     if (card) card.classList.add('selected');
   }
 
@@ -639,68 +679,215 @@
   }
 
   async function submitNewAgent() {
-    const name = document.getElementById('new-name').value.trim();
-    const cli = document.getElementById('new-cli').value;
-    const token = document.getElementById('new-token').value.trim();
-    const usersRaw = document.getElementById('new-users').value.trim();
-    const errEl = document.getElementById('form-error');
+    const name = document.getElementById('new-agent-name').value.trim();
+    const type = document.getElementById('new-agent-type').value;
+    const errEl = document.getElementById('agent-form-error');
     errEl.textContent = '';
 
     if (!name) { errEl.textContent = 'Nhập tên agent'; return; }
-    if (!cli) { errEl.textContent = 'Chọn CLI'; return; }
-    if (!token) { errEl.textContent = 'Nhập Bot Token'; return; }
-    if (!usersRaw) { errEl.textContent = 'Nhập ít nhất 1 User ID'; return; }
+    if (!type) { errEl.textContent = 'Chọn loại CLI'; return; }
 
-    const allowedUsers = usersRaw.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
-    if (!allowedUsers.length) { errEl.textContent = 'User ID không hợp lệ'; return; }
-
-    const btn = document.getElementById('btn-create');
+    const btn = document.getElementById('btn-create-agent');
     btn.textContent = 'Đang tạo...'; btn.disabled = true;
 
-    const res = await api('/api/agents', {
+    const res = await api('/api/ai-agents', {
       method: 'POST',
-      body: JSON.stringify({ name, cli, botToken: token, allowedUsers })
+      body: JSON.stringify({ name, type })
     });
 
     btn.textContent = 'Tạo Agent'; btn.disabled = false;
 
-    if (!res || !res.ok) {
-      errEl.textContent = res?.error || 'Lỗi không xác định'; return;
-    }
-
+    if (!res || !res.ok) { errEl.textContent = res?.error || 'Lỗi không xác định'; return; }
     closeNewAgent();
-    loadAgents();
+    loadAiAgents();
   }
 
-  // ── Sessions ─────────────────────────────────────────────────────────────────
-  async function loadSessions() {
-    const agents = await api('/api/agents');
-    if (!agents) return;
-    const totalMsgs = agents.reduce((s,a) => s + a.sessionStats.messageCount, 0);
-    const totalKb = agents.reduce((s,a) => s + a.sessionStats.fileSizeBytes, 0);
-    document.getElementById('session-stats').innerHTML = `
-      <div class="stat-card"><div class="stat-label">Agents</div><div class="stat-value">${agents.length}</div></div>
-      <div class="stat-card"><div class="stat-label">Running</div><div class="stat-value">${agents.filter(a=>a.running).length}</div></div>
-      <div class="stat-card"><div class="stat-label">Messages</div><div class="stat-value">${totalMsgs}</div></div>
-      <div class="stat-card"><div class="stat-label">Storage</div><div class="stat-value" style="font-size:20px">${(totalKb/1024).toFixed(1)}<span style="font-size:12px;font-weight:400;color:var(--text-3)"> KB</span></div></div>
-    `;
-    document.getElementById('sessions-list').innerHTML = agents.map(a => {
-      const pct = Math.min(100, (a.sessionStats.messageCount/80*100)).toFixed(0);
-      return `<div class="card">
-        <div class="session-head">
-          <span class="session-name">${escHtml(a.name)}</span>
-          <span class="badge ${a.cli}">${a.cli}</span>
-          <span class="badge ${a.running?'running':'stopped'}"><span class="dot"></span>${a.running?'Running':'Stopped'}</span>
+  // ── Workers ──────────────────────────────────────────────────────────────────
+  async function loadWorkers() {
+    const workers = await api('/api/workers');
+    const el = document.getElementById('workers-list');
+    if (!workers || !workers.length) {
+      el.innerHTML = '<div class="empty">Chưa có Worker nào.<br>Nhấn <strong>+ New Worker</strong> để tạo.</div>';
+      return;
+    }
+    el.innerHTML = workers.map(w => `
+      <div class="card">
+        <div class="agent-row">
+          <div class="worker-card-body">
+            <div class="worker-name">${escHtml(w.name)}</div>
+            <div class="worker-meta">
+              Agent: <strong>${escHtml(w.agentName)}</strong>
+              <span class="meta-sep">·</span>
+              <span class="badge ${w.agentType}">${w.agentType}</span>
+              <span class="meta-sep">·</span>
+              ${w.messageCount} msgs
+            </div>
+          </div>
+          <div class="agent-side">
+            <span class="badge ${w.running?'running':'stopped'}">
+              <span class="dot"></span>${w.running?'Running':'Stopped'}
+            </span>
+            ${w.running
+              ? `<button class="btn stop" onclick="stopWorker('${w.id}')">Stop</button>`
+              : `<button class="btn start" onclick="startWorker('${w.id}')">Start</button>`}
+            <button class="btn swap" onclick="openSwapModal('${w.id}', '${escHtml(w.name)}', '${w.activeAgentId}')">Swap</button>
+            <button class="btn danger" onclick="deleteWorker('${w.id}', '${escHtml(w.name)}')">Xoá</button>
+          </div>
         </div>
-        <div class="session-grid">
-          <div class="session-stat"><div class="s-label">Session ID</div><div class="s-value" style="font-size:11.5px;font-family:monospace">${a.sessionId.substring(0,14)}…</div></div>
-          <div class="session-stat"><div class="s-label">Messages</div><div class="s-value">${a.sessionStats.messageCount}</div></div>
-          <div class="session-stat"><div class="s-label">Size</div><div class="s-value">${(a.sessionStats.fileSizeBytes/1024).toFixed(1)} KB</div></div>
-          <div class="session-stat"><div class="s-label">To backup</div><div class="s-value">${pct}%</div></div>
+      </div>
+    `).join('');
+  }
+
+  async function startWorker(id) { await api(`/api/workers/${id}/start`, {method:'POST'}); loadWorkers(); }
+  async function stopWorker(id) { await api(`/api/workers/${id}/stop`, {method:'POST'}); loadWorkers(); }
+  async function deleteWorker(id, name) {
+    if (!confirm(`Xoá Worker "${name}"?`)) return;
+    await api(`/api/workers/${id}`, {method:'DELETE'});
+    loadWorkers();
+  }
+
+  // New Worker modal
+  let selectedWorkerAgentId = '';
+
+  async function openNewWorker() {
+    selectedWorkerAgentId = '';
+    document.getElementById('new-worker-name').value = '';
+    document.getElementById('new-worker-token').value = '';
+    document.getElementById('new-worker-users').value = '';
+    document.getElementById('new-worker-prompt').value = '';
+    document.getElementById('new-worker-pin').value = '';
+    document.getElementById('new-worker-agent-id').value = '';
+    document.getElementById('worker-form-error').textContent = '';
+
+    // Load agent list
+    const agents = await api('/api/ai-agents');
+    const listEl = document.getElementById('worker-agent-list');
+    if (!agents || !agents.length) {
+      listEl.innerHTML = '<div style="font-size:12px;color:var(--text-3)">Chưa có AI Agent nào. Tạo agent trước.</div>';
+    } else {
+      listEl.innerHTML = agents.map(a => `
+        <div class="agent-radio-item" id="wagent-${a.id}" onclick="selectWorkerAgent('${a.id}')">
+          <div class="agent-radio-dot"></div>
+          <div>
+            <div class="agent-radio-name">${escHtml(a.name)}</div>
+            <div class="agent-radio-sub">${a.type}</div>
+          </div>
         </div>
-        <div class="progress-track" style="margin-top:14px"><div class="progress-fill" style="width:${pct}%"></div></div>
-      </div>`;
-    }).join('');
+      `).join('');
+      if (agents.length === 1) selectWorkerAgent(agents[0].id);
+    }
+
+    document.getElementById('modal-new-worker').classList.add('open');
+  }
+
+  function selectWorkerAgent(id) {
+    selectedWorkerAgentId = id;
+    document.getElementById('new-worker-agent-id').value = id;
+    document.querySelectorAll('.agent-radio-item').forEach(el => el.classList.remove('selected'));
+    const item = document.getElementById(`wagent-${id}`);
+    if (item) item.classList.add('selected');
+  }
+
+  function closeNewWorker() {
+    document.getElementById('modal-new-worker').classList.remove('open');
+  }
+
+  async function submitNewWorker() {
+    const name = document.getElementById('new-worker-name').value.trim();
+    const botToken = document.getElementById('new-worker-token').value.trim();
+    const usersRaw = document.getElementById('new-worker-users').value.trim();
+    const systemPrompt = document.getElementById('new-worker-prompt').value.trim();
+    const pin = document.getElementById('new-worker-pin').value;
+    const agentId = document.getElementById('new-worker-agent-id').value;
+    const errEl = document.getElementById('worker-form-error');
+    errEl.textContent = '';
+
+    if (!name) { errEl.textContent = 'Nhập tên worker'; return; }
+    if (!botToken) { errEl.textContent = 'Nhập Bot Token'; return; }
+    if (!usersRaw) { errEl.textContent = 'Nhập ít nhất 1 User ID'; return; }
+    if (!pin || pin.length < 4) { errEl.textContent = 'PIN ít nhất 4 ký tự'; return; }
+    if (!agentId) { errEl.textContent = 'Chọn AI Agent'; return; }
+
+    const allowedUsers = usersRaw.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
+    if (!allowedUsers.length) { errEl.textContent = 'User ID không hợp lệ'; return; }
+
+    const btn = document.getElementById('btn-create-worker');
+    btn.textContent = 'Đang tạo...'; btn.disabled = true;
+
+    const res = await api('/api/workers', {
+      method: 'POST',
+      body: JSON.stringify({ name, botToken, allowedUsers, systemPrompt, pin, agentId })
+    });
+
+    btn.textContent = 'Tạo Worker'; btn.disabled = false;
+
+    if (!res || !res.ok) { errEl.textContent = res?.error || 'Lỗi không xác định'; return; }
+    closeNewWorker();
+    loadWorkers();
+  }
+
+  // Swap Agent modal
+  let swapWorkerId = '';
+  let swapCurrentAgentId = '';
+  let selectedSwapAgentId = '';
+
+  async function openSwapModal(workerId, workerName, currentAgentId) {
+    swapWorkerId = workerId;
+    swapCurrentAgentId = currentAgentId;
+    selectedSwapAgentId = '';
+    document.getElementById('swap-worker-name').textContent = workerName;
+    document.getElementById('swap-form-error').textContent = '';
+
+    const agents = await api('/api/ai-agents');
+    const listEl = document.getElementById('swap-agent-list');
+
+    // Show all agents except current
+    const others = (agents || []).filter(a => a.id !== currentAgentId);
+    if (!others.length) {
+      listEl.innerHTML = '<div style="font-size:12px;color:var(--text-3)">Không có agent nào khác trong pool.</div>';
+    } else {
+      listEl.innerHTML = others.map(a => `
+        <div class="agent-radio-item" id="swagent-${a.id}" onclick="selectSwapAgent('${a.id}')">
+          <div class="agent-radio-dot"></div>
+          <div>
+            <div class="agent-radio-name">${escHtml(a.name)}</div>
+            <div class="agent-radio-sub">${a.type}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    document.getElementById('modal-swap-agent').classList.add('open');
+  }
+
+  function selectSwapAgent(id) {
+    selectedSwapAgentId = id;
+    document.querySelectorAll('#swap-agent-list .agent-radio-item').forEach(el => el.classList.remove('selected'));
+    const item = document.getElementById(`swagent-${id}`);
+    if (item) item.classList.add('selected');
+  }
+
+  function closeSwapModal() {
+    document.getElementById('modal-swap-agent').classList.remove('open');
+  }
+
+  async function submitSwap() {
+    const errEl = document.getElementById('swap-form-error');
+    if (!selectedSwapAgentId) { errEl.textContent = 'Chọn agent để swap'; return; }
+
+    const btn = document.getElementById('btn-swap');
+    btn.textContent = 'Đang swap...'; btn.disabled = true;
+
+    const res = await api(`/api/workers/${swapWorkerId}/swap`, {
+      method: 'POST',
+      body: JSON.stringify({ agentId: selectedSwapAgentId })
+    });
+
+    btn.textContent = 'Swap Agent'; btn.disabled = false;
+
+    if (!res || !res.ok) { errEl.textContent = res?.error || 'Lỗi không xác định'; return; }
+    closeSwapModal();
+    loadWorkers();
   }
 
   // ── Backups ──────────────────────────────────────────────────────────────────
@@ -733,12 +920,12 @@
 
   // ── Logs ─────────────────────────────────────────────────────────────────────
   async function populateLogSelect() {
-    const agents = await api('/api/agents');
-    if (!agents) return;
+    const workers = await api('/api/workers');
+    if (!workers) return;
     const sel = document.getElementById('log-select');
     const cur = sel.value;
-    sel.innerHTML = '<option value="">Chọn agent...</option>' +
-      agents.map(a => `<option value="${escHtml(a.name)}"${a.name===cur?' selected':''}>${escHtml(a.name)}</option>`).join('');
+    sel.innerHTML = '<option value="">Chọn worker...</option>' +
+      workers.map(w => `<option value="${escHtml(w.name)}"${w.name===cur?' selected':''}>${escHtml(w.name)}</option>`).join('');
     if (cur) loadLogs();
   }
 
