@@ -21,9 +21,14 @@ import { listBackups, readBackup } from '../lib/backup.js';
 import { readLog } from '../lib/logger.js';
 import { manager } from '../bot/manager.js';
 import { checkForUpdate, applyUpdate, restartGns } from '../lib/updater.js';
+import { setupMcpRoutes } from '../mcp/server.js';
 
 const app = express();
 app.use(express.json());
+
+// ─── MCP Server routes ────────────────────────────────────────────────────────
+setupMcpRoutes(app);
+
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
