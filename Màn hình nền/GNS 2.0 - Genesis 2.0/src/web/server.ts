@@ -26,7 +26,7 @@ app.use(express.json());
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   if (req.method === 'OPTIONS') { res.sendStatus(204); return; }
   next();
 });
@@ -83,7 +83,7 @@ app.get('/api/ai-agents', authMiddleware, (_req: Request, res: Response) => {
 
 app.post('/api/ai-agents', authMiddleware, (req: Request, res: Response) => {
   try {
-    const { name, type } = req.body ?? {};
+    const { name, type, model } = req.body ?? {};
     if (!name || !type) {
       res.status(400).json({ error: 'Thiếu name hoặc type' }); return;
     }
@@ -95,13 +95,32 @@ app.post('/api/ai-agents', authMiddleware, (req: Request, res: Response) => {
     if (!available[cliKey]) {
       res.status(400).json({ error: `CLI "${cliKey}" chưa được cài trên máy này` }); return;
     }
+    // Default model nếu không chọn
+    const defaultModel = type === 'claude-cli' ? 'claude-sonnet-4-5' : 'gemini-2.5-pro';
     const agent: AgentInstance = {
       id: crypto.randomUUID(),
       name,
       type,
+      model: model || defaultModel,
       sessionId: crypto.randomUUID(),
       createdAt: new Date().toISOString(),
     };
+    saveAiAgent(agent);
+    res.json({ ok: true, agent });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// ─── PUT /api/ai-agents/:id ───────────────────────────────────────────────────
+
+app.put('/api/ai-agents/:id', authMiddleware, (req: Request, res: Response) => {
+  try {
+    const agent = loadAiAgent(req.params.id);
+    if (!agent) { res.status(404).json({ error: 'Không tìm thấy agent' }); return; }
+    const { name, model } = req.body ?? {};
+    if (name) agent.name = name;
+    if (model) agent.model = model;
     saveAiAgent(agent);
     res.json({ ok: true, agent });
   } catch (err) {
@@ -155,6 +174,45 @@ app.post('/api/workers', authMiddleware, async (req: Request, res: Response) => 
     };
     saveWorker(worker);
     res.json({ ok: true, worker: { ...worker, sessionPin: '[hashed]', conversationLog: [] } });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// ─── GET /api/workers/:id/detail ─────────────────────────────────────────────
+
+app.get('/api/workers/:id/detail', authMiddleware, (req: Request, res: Response) => {
+  try {
+    const worker = loadWorker(req.params.id);
+    if (!worker) { res.status(404).json({ error: 'Không tìm thấy worker' }); return; }
+    res.json({
+      id: worker.id,
+      name: worker.name,
+      allowedUsers: worker.allowedUsers,
+      systemPrompt: worker.systemPrompt,
+    });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// ─── PUT /api/workers/:id ─────────────────────────────────────────────────────
+
+app.put('/api/workers/:id', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const worker = loadWorker(req.params.id);
+    if (!worker) { res.status(404).json({ error: 'Không tìm thấy worker' }); return; }
+    const { name, botToken, allowedUsers, systemPrompt, pin } = req.body ?? {};
+    if (name) worker.name = name;
+    if (botToken) worker.botToken = botToken;
+    if (allowedUsers) worker.allowedUsers = (allowedUsers as number[]).map(Number).filter(n => !isNaN(n));
+    if (systemPrompt !== undefined) worker.systemPrompt = systemPrompt;
+    if (pin && String(pin).length >= 4) worker.sessionPin = await bcrypt.hash(String(pin), 10);
+    saveWorker(worker);
+    // Luôn restart để áp dụng thay đổi (token mới, v.v.)
+    await manager.stopWorker(req.params.id);
+    manager.startWorker(req.params.id);
+    res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: String(err) });
   }

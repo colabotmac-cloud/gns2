@@ -18,6 +18,8 @@ export class TelegramBotService {
   private isNewSession: boolean = false;
   private running: boolean = false;
   private awaitingPin: boolean = false;
+  // Queue để serialize tin nhắn — tránh concurrent callAI cùng sessionId
+  private messageQueue: Promise<void> = Promise.resolve();
 
   constructor(worker: WorkerInstance, agent: AgentInstance) {
     this.worker = worker;
@@ -132,63 +134,71 @@ export class TelegramBotService {
       // Bỏ qua các lệnh khác không nhận dạng được
       if (text.startsWith('/')) return;
 
-      // ── Kiểm tra backup tự động ──────────────────────────────────────────
-
-      if (shouldBackup(this.worker)) {
-        log(name, 'ConversationLog sắp đầy — tự động backup và tạo session mới');
-        try {
-          backupSession(this.worker, this.agent);
-          await ctx.reply('Session đã đầy, đã backup và bắt đầu session mới tự động.');
-        } catch (err) {
-          logError(name, `Auto backup lỗi: ${err}`);
-        }
-        clearLog(this.worker);
-        if (this.agent.type === 'claude-cli') {
-          this.agent.sessionId = randomUUID();
-          saveAiAgent(this.agent);
-          this.isNewSession = true;
-        }
-        saveWorker(this.worker);
-      }
-
-      // ── Xử lý tin nhắn thường ───────────────────────────────────────────
-
-      const typingInterval = setInterval(() => {
-        ctx.sendChatAction('typing').catch(() => {});
-      }, 4000);
-      ctx.sendChatAction('typing').catch(() => {});
-
-      const msgCount = getLogStats(this.worker).messageCount;
-      log(name, `Tin nhắn #${msgCount + 1}: ${text.substring(0, 80)}${text.length > 80 ? '...' : ''}`);
-
-      // Append user message trước khi gọi AI
-      appendToLog(this.worker, 'user', text, this.agent.id);
-
-      try {
-        const response = await callAI(this.agent, this.worker, text, this.isNewSession);
-
-        clearInterval(typingInterval);
-        this.isNewSession = false;
-
-        // Append assistant response
-        appendToLog(this.worker, 'assistant', response, this.agent.id);
-        saveWorker(this.worker);
-
-        await this.sendLongMessage(ctx, response);
-
-      } catch (err) {
-        clearInterval(typingInterval);
-        // Remove the user message we appended if AI failed
-        this.worker.conversationLog.pop();
-        const message = err instanceof Error ? err.message : String(err);
-        logError(name, `Lỗi xử lý tin nhắn: ${message}`);
-        await ctx.reply(`Lỗi: ${message}`);
-      }
+      // ── Queue tin nhắn — xử lý tuần tự để tránh race condition ─────────
+      this.messageQueue = this.messageQueue.then(() =>
+        this.handleUserMessage(ctx, text)
+      );
     });
 
     this.bot.catch((err) => {
       logError(name, `Bot error: ${err}`);
     });
+  }
+
+  // ─── Xử lý tin nhắn thường (được gọi qua queue) ────────────────────────────
+
+  private async handleUserMessage(ctx: any, text: string): Promise<void> {
+    const { name } = this.worker;
+
+    // ── Kiểm tra backup tự động ────────────────────────────────────────────
+    if (shouldBackup(this.worker)) {
+      log(name, 'ConversationLog sắp đầy — tự động backup và tạo session mới');
+      try {
+        backupSession(this.worker, this.agent);
+        await ctx.reply('Session đã đầy, đã backup và bắt đầu session mới tự động.');
+      } catch (err) {
+        logError(name, `Auto backup lỗi: ${err}`);
+      }
+      clearLog(this.worker);
+      if (this.agent.type === 'claude-cli') {
+        this.agent.sessionId = randomUUID();
+        saveAiAgent(this.agent);
+        this.isNewSession = true;
+      }
+      saveWorker(this.worker);
+    }
+
+    const typingInterval = setInterval(() => {
+      ctx.sendChatAction('typing').catch(() => {});
+    }, 4000);
+    ctx.sendChatAction('typing').catch(() => {});
+
+    const msgCount = getLogStats(this.worker).messageCount;
+    log(name, `Tin nhắn #${msgCount + 1}: ${text.substring(0, 80)}${text.length > 80 ? '...' : ''}`);
+
+    // Append user message trước khi gọi AI
+    appendToLog(this.worker, 'user', text, this.agent.id);
+
+    try {
+      const response = await callAI(this.agent, this.worker, text, this.isNewSession);
+
+      clearInterval(typingInterval);
+      this.isNewSession = false;
+
+      // Append assistant response
+      appendToLog(this.worker, 'assistant', response, this.agent.id);
+      saveWorker(this.worker);
+
+      await this.sendLongMessage(ctx, response);
+
+    } catch (err) {
+      clearInterval(typingInterval);
+      // Remove the user message we appended if AI failed
+      this.worker.conversationLog.pop();
+      const message = err instanceof Error ? err.message : String(err);
+      logError(name, `Lỗi xử lý tin nhắn: ${message}`);
+      await ctx.reply(`Lỗi: ${message}`);
+    }
   }
 
   // Gửi tin nhắn dài — cắt thành nhiều phần nếu vượt giới hạn Telegram
@@ -208,7 +218,10 @@ export class TelegramBotService {
     if (this.running) return;
     this.running = true;
     log(this.worker.name, `Bot khởi động — Agent: ${this.agent.name} (${this.agent.type})`);
-    this.bot.launch();
+    this.bot.launch().catch((err: Error) => {
+      this.running = false;
+      logError(this.worker.name, `Lỗi khởi động bot (token sai?): ${err.message}`);
+    });
   }
 
   async stop() {

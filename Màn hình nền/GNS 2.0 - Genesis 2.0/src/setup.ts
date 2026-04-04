@@ -169,10 +169,12 @@ async function createAgentStep(available: Array<'claude-cli' | 'gemini-cli'>): P
     type = typeStr;
   }
 
+  const defaultModel = type === 'claude-cli' ? 'claude-sonnet-4-5' : 'gemini-2.5-pro';
   const agent: AgentInstance = {
     id: crypto.randomUUID(),
     name,
     type,
+    model: defaultModel,
     sessionId: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
   };

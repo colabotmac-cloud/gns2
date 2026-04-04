@@ -2,7 +2,7 @@ import { spawn } from 'child_process';
 import os from 'os';
 import path from 'path';
 import type { AgentInstance, WorkerInstance } from '../lib/config.js';
-import { getRecentLog } from '../lib/session.js';
+import { getRecentLog, claudeSessionExists } from '../lib/session.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -68,10 +68,19 @@ export async function callClaude(
     '--permission-mode', 'bypassPermissions',
     '--output-format', 'text',
     '--max-turns', '5',
-    isNewSession ? '--session-id' : '--resume',
-    agent.sessionId,
-    prompt,
+    '--model', agent.model || 'claude-sonnet-4-5',
   ];
+
+  if (worker.systemPrompt) {
+    args.push('--system-prompt', worker.systemPrompt);
+  }
+
+  // Luôn kiểm tra file thực tế để tránh lỗi "session already in use"
+  // khi nhiều tin nhắn đến cùng lúc hoặc session đã được tạo trước đó
+  const sessionFileExists = claudeSessionExists(agent);
+  const sessionFlag = (isNewSession && !sessionFileExists) ? '--session-id' : '--resume';
+  args.push(sessionFlag, agent.sessionId);
+  args.push(prompt);
 
   const cwd = os.homedir();
   return runCommand('claude', args, cwd, 180_000);
@@ -108,12 +117,16 @@ export async function callGemini(
   const fullPrompt = buildGeminiPrompt(worker, prompt);
   const cwd = os.homedir();
 
-  return runCommand(
-    'gemini',
-    ['-p', fullPrompt],
-    cwd,
-    180_000
-  );
+  const args: string[] = [];
+  if (agent.model) {
+    args.push('-m', agent.model);
+  }
+  if (worker.systemPrompt) {
+    args.push('-s', worker.systemPrompt);
+  }
+  args.push('-p', fullPrompt);
+
+  return runCommand('gemini', args, cwd, 180_000);
 }
 
 // ─── Unified call ─────────────────────────────────────────────────────────────

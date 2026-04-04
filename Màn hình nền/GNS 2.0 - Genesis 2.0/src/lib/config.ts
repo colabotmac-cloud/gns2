@@ -22,6 +22,7 @@ export interface AgentInstance {
   id: string;           // uuid
   name: string;         // display name
   type: 'claude-cli' | 'gemini-cli';
+  model: string;        // e.g. claude-sonnet-4-5 / gemini-2.5-pro
   sessionId: string;    // Claude --resume ID (created at Agent creation time)
   createdAt: string;
 }

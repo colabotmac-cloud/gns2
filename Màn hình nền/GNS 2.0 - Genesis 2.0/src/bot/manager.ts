@@ -22,9 +22,14 @@ class BotManager {
   private bots: Map<string, TelegramBotService> = new Map(); // workerId → bot
 
   startWorker(workerId: string): void {
-    if (this.bots.has(workerId)) {
-      log('manager', `Worker "${workerId}" đã đang chạy`);
-      return;
+    // Nếu có trong map nhưng không còn running (bị lỗi) → xoá để restart
+    const existing = this.bots.get(workerId);
+    if (existing) {
+      if (existing.isRunning()) {
+        log('manager', `Worker "${workerId}" đã đang chạy`);
+        return;
+      }
+      this.bots.delete(workerId);
     }
 
     const worker = loadWorker(workerId);
@@ -124,6 +129,10 @@ class BotManager {
         messageCount: bot?.getMessageCount() ?? getLogStats(worker).messageCount,
       };
     });
+  }
+
+  isWorkerRunning(workerId: string): boolean {
+    return this.bots.has(workerId) && (this.bots.get(workerId)?.isRunning() ?? false);
   }
 
   getWorkerStatus(workerId: string): WorkerStatus | null {
