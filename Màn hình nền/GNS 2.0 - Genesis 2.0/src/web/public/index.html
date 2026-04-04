@@ -303,9 +303,80 @@
     .empty { color: var(--text-3); font-size: 13px; text-align: center; padding: 48px 20px; line-height: 2; }
     .empty code { font-family: monospace; font-size: 12px; background: var(--border-light); padding: 1px 7px; border-radius: 4px; }
     .form-error { font-size: 12px; color: var(--red); margin-top: 8px; }
+
+    /* ─── Update Banner ─── */
+    #update-banner {
+      display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 999;
+      background: #1a4a2e; color: #d4f5e2; font-size: 13px;
+      padding: 10px 20px; align-items: center; gap: 12px; justify-content: center;
+    }
+    #update-banner.show { display: flex; }
+    #update-banner .banner-text { flex: 1; text-align: center; }
+    #update-banner .banner-text strong { color: #6ee8a4; }
+    #update-banner .btn-update {
+      background: #6ee8a4; color: #0f2d1c; border: none; border-radius: 6px;
+      padding: 5px 14px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+    }
+    #update-banner .btn-update:hover { background: #4fd68a; }
+    #update-banner .btn-dismiss {
+      background: none; border: none; color: #8fcca8; cursor: pointer; font-size: 18px; line-height: 1;
+      padding: 0 4px;
+    }
+    #update-modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 2000;
+      align-items: center; justify-content: center;
+    }
+    #update-modal-overlay.show { display: flex; }
+    #update-modal {
+      background: var(--surface); border-radius: var(--radius); width: 480px; max-width: 95vw;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.18); overflow: hidden;
+    }
+    #update-modal .modal-header {
+      padding: 18px 20px 14px; border-bottom: 1px solid var(--border);
+      font-weight: 600; font-size: 15px;
+    }
+    #update-modal .modal-body { padding: 16px 20px; }
+    #update-modal .update-log {
+      background: #111; color: #d4f5e2; font-family: monospace; font-size: 12px;
+      border-radius: 6px; padding: 12px; max-height: 220px; overflow-y: auto;
+      line-height: 1.7; white-space: pre-wrap; margin: 12px 0 0;
+    }
+    #update-modal .modal-footer {
+      padding: 12px 20px; border-top: 1px solid var(--border);
+      display: flex; gap: 8px; justify-content: flex-end;
+    }
   </style>
 </head>
 <body>
+
+<!-- UPDATE BANNER -->
+<div id="update-banner">
+  <span class="banner-text">
+    🎉 Có phiên bản mới! <strong id="banner-commit"></strong>
+    — Cập nhật để nhận tính năng mới nhất.
+  </span>
+  <button class="btn-update" onclick="openUpdateModal()">Cập nhật ngay</button>
+  <button class="btn-dismiss" onclick="dismissBanner()" title="Bỏ qua">×</button>
+</div>
+
+<!-- UPDATE MODAL -->
+<div id="update-modal-overlay">
+  <div id="update-modal">
+    <div class="modal-header">🔄 Cập nhật GNS 2.0</div>
+    <div class="modal-body">
+      <div id="update-status-text" style="color:var(--text-2);font-size:13px;">
+        Nhấn "Bắt đầu" để pull code mới từ GitHub, cài dependencies và build lại.
+      </div>
+      <div class="update-log" id="update-log" style="display:none"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeUpdateModal()" id="btn-cancel-update">Hủy</button>
+      <button class="btn btn-restart" id="btn-restart-update" style="display:none"
+        onclick="restartAfterUpdate()">🔁 Restart ngay</button>
+      <button class="btn btn-primary" id="btn-start-update" onclick="startUpdate()">Bắt đầu cập nhật</button>
+    </div>
+  </div>
+</div>
 
 <!-- LOGIN -->
 <div id="login-screen">
@@ -1136,6 +1207,87 @@
   }
 
   function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  // ── Update System ─────────────────────────────────────────────────────────────
+
+  async function checkUpdate() {
+    try {
+      const info = await api('/api/update/check');
+      if (!info || info.error || !info.hasUpdate) return;
+      document.getElementById('banner-commit').textContent =
+        `${info.currentCommit} → ${info.latestCommit}`;
+      document.getElementById('update-banner').classList.add('show');
+    } catch { /* silent */ }
+  }
+
+  function dismissBanner() {
+    document.getElementById('update-banner').classList.remove('show');
+  }
+
+  function openUpdateModal() {
+    document.getElementById('update-log').style.display = 'none';
+    document.getElementById('update-log').textContent = '';
+    document.getElementById('update-status-text').textContent =
+      'Nhấn "Bắt đầu" để pull code mới từ GitHub, cài dependencies và build lại.';
+    document.getElementById('btn-start-update').style.display = '';
+    document.getElementById('btn-restart-update').style.display = 'none';
+    document.getElementById('btn-cancel-update').textContent = 'Hủy';
+    document.getElementById('update-modal-overlay').classList.add('show');
+  }
+
+  function closeUpdateModal() {
+    document.getElementById('update-modal-overlay').classList.remove('show');
+  }
+
+  async function startUpdate() {
+    const btnStart = document.getElementById('btn-start-update');
+    const logEl = document.getElementById('update-log');
+    const statusEl = document.getElementById('update-status-text');
+
+    btnStart.disabled = true;
+    btnStart.textContent = 'Đang cập nhật...';
+    statusEl.textContent = 'Đang kéo code từ GitHub...';
+    logEl.style.display = 'block';
+    logEl.textContent = '';
+
+    try {
+      const res = await api('/api/update/apply', { method: 'POST' });
+      if (!res) { statusEl.textContent = 'Lỗi kết nối server'; btnStart.disabled = false; return; }
+
+      logEl.textContent = (res.log || []).join('\n');
+      logEl.scrollTop = logEl.scrollHeight;
+
+      if (res.ok) {
+        statusEl.textContent = '✅ Cập nhật xong! Cần restart để áp dụng.';
+        btnStart.style.display = 'none';
+        document.getElementById('btn-cancel-update').textContent = 'Đóng';
+        document.getElementById('btn-restart-update').style.display = '';
+        document.getElementById('update-banner').classList.remove('show');
+      } else {
+        statusEl.textContent = `❌ Lỗi: ${res.error || 'Không rõ'}`;
+        btnStart.disabled = false;
+        btnStart.textContent = 'Thử lại';
+      }
+    } catch (e) {
+      statusEl.textContent = 'Lỗi kết nối';
+      btnStart.disabled = false;
+      btnStart.textContent = 'Thử lại';
+    }
+  }
+
+  async function restartAfterUpdate() {
+    const btn = document.getElementById('btn-restart-update');
+    btn.textContent = 'Đang restart...'; btn.disabled = true;
+    await api('/api/update/restart', { method: 'POST' }).catch(() => {});
+    setTimeout(() => { window.location.reload(); }, 4000);
+  }
+
+  // Check update 30s sau khi login (không block startup)
+  const _origShowApp = showApp;
+  function showApp() {
+    _origShowApp();
+    setTimeout(checkUpdate, 30_000);
+  }
 
   if (TOKEN) showApp();
 </script>

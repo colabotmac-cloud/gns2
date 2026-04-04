@@ -20,6 +20,7 @@ import {
 import { listBackups, readBackup } from '../lib/backup.js';
 import { readLog } from '../lib/logger.js';
 import { manager } from '../bot/manager.js';
+import { checkForUpdate, applyUpdate, restartGns } from '../lib/updater.js';
 
 const app = express();
 app.use(express.json());
@@ -305,6 +306,35 @@ app.get('/api/logs/:name', authMiddleware, (req: Request, res: Response) => {
   } catch (err) {
     res.status(500).json({ error: String(err) });
   }
+});
+
+// ─── GET /api/update/check ────────────────────────────────────────────────────
+
+app.get('/api/update/check', authMiddleware, (_req: Request, res: Response) => {
+  try {
+    const info = checkForUpdate();
+    res.json(info);
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// ─── POST /api/update/apply ───────────────────────────────────────────────────
+
+app.post('/api/update/apply', authMiddleware, async (_req: Request, res: Response) => {
+  try {
+    const result = await applyUpdate();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ ok: false, log: [], error: String(err) });
+  }
+});
+
+// ─── POST /api/update/restart ─────────────────────────────────────────────────
+
+app.post('/api/update/restart', authMiddleware, (_req: Request, res: Response) => {
+  res.json({ ok: true, message: 'Đang restart...' });
+  restartGns();
 });
 
 // ─── Start server ─────────────────────────────────────────────────────────────
