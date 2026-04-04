@@ -37,8 +37,10 @@ export interface LogEntry {
 export interface WorkerInstance {
   id: string;           // uuid
   name: string;
+  platform?: 'telegram' | 'discord'; // default 'telegram'
   botToken: string;
-  allowedUsers: number[];
+  allowedUsers: number[];            // Telegram user IDs hoặc Discord user IDs (số)
+  discordChannelIds?: string[];      // Discord channel/thread IDs bot lắng nghe
   systemPrompt: string;
   sessionPin: string;   // bcrypt hash of PIN
   activeAgentId: string;

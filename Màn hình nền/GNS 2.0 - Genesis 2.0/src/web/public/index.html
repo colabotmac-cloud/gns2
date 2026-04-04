@@ -542,13 +542,28 @@
         <input type="text" id="new-worker-name" placeholder="My Bot" />
       </div>
       <div class="field">
-        <label>Telegram Bot Token <span style="color:var(--text-3);font-weight:400">(từ @BotFather)</span></label>
+        <label>Platform</label>
+        <select id="new-worker-platform" onchange="onNewWorkerPlatformChange()">
+          <option value="telegram">📱 Telegram</option>
+          <option value="discord">🎮 Discord</option>
+        </select>
+      </div>
+      <div class="field" id="new-worker-token-wrap">
+        <label id="new-worker-token-label">Telegram Bot Token <span style="color:var(--text-3);font-weight:400">(từ @BotFather)</span></label>
         <input type="text" id="new-worker-token" placeholder="123456:ABC-..." />
+        <div class="hint" id="new-worker-token-hint">
+          Tạo bot: nhắn <code>/newbot</code> cho <code>@BotFather</code>
+        </div>
+      </div>
+      <div class="field" id="new-worker-channels-wrap" style="display:none">
+        <label>Discord Channel IDs <span style="color:var(--text-3);font-weight:400">(phân cách bằng dấu phẩy)</span></label>
+        <input type="text" id="new-worker-channels" placeholder="1234567890,9876543210" />
+        <div class="hint">Bật Developer Mode → chuột phải channel → Copy ID</div>
       </div>
       <div class="field">
         <label>Allowed User IDs <span style="color:var(--text-3);font-weight:400">(phân cách bằng dấu phẩy)</span></label>
         <input type="text" id="new-worker-users" placeholder="6597520958" />
-        <div class="hint">Tìm ID: nhắn <code>/start</code> cho <code>@userinfobot</code></div>
+        <div class="hint" id="new-worker-users-hint">Tìm ID: nhắn <code>/start</code> cho <code>@userinfobot</code></div>
       </div>
       <div class="field">
         <label>System Prompt <span style="color:var(--text-3);font-weight:400">(tùy chọn)</span></label>
@@ -956,10 +971,29 @@
     document.getElementById('modal-new-worker').classList.remove('open');
   }
 
+  function onNewWorkerPlatformChange() {
+    const platform = document.getElementById('new-worker-platform').value;
+    const isDiscord = platform === 'discord';
+    document.getElementById('new-worker-token-label').innerHTML = isDiscord
+      ? 'Discord Bot Token <span style="color:var(--text-3);font-weight:400">(từ Discord Developer Portal)</span>'
+      : 'Telegram Bot Token <span style="color:var(--text-3);font-weight:400">(từ @BotFather)</span>';
+    document.getElementById('new-worker-token').placeholder = isDiscord
+      ? 'MTxxxxxxxxx.Gxxxxx...' : '123456:ABC-...';
+    document.getElementById('new-worker-token-hint').innerHTML = isDiscord
+      ? 'Tạo bot tại <a href="https://discord.com/developers/applications" target="_blank">discord.com/developers</a> → Bot → Reset Token'
+      : 'Tạo bot: nhắn <code>/newbot</code> cho <code>@BotFather</code>';
+    document.getElementById('new-worker-channels-wrap').style.display = isDiscord ? '' : 'none';
+    document.getElementById('new-worker-users-hint').innerHTML = isDiscord
+      ? 'Bật Developer Mode → chuột phải tên user → Copy ID'
+      : 'Tìm ID: nhắn <code>/start</code> cho <code>@userinfobot</code>';
+  }
+
   async function submitNewWorker() {
     const name = document.getElementById('new-worker-name').value.trim();
+    const platform = document.getElementById('new-worker-platform').value;
     const botToken = document.getElementById('new-worker-token').value.trim();
     const usersRaw = document.getElementById('new-worker-users').value.trim();
+    const channelsRaw = document.getElementById('new-worker-channels').value.trim();
     const systemPrompt = document.getElementById('new-worker-prompt').value.trim();
     const pin = document.getElementById('new-worker-pin').value;
     const agentId = document.getElementById('new-worker-agent-id').value;
@@ -975,12 +1009,16 @@
     const allowedUsers = usersRaw.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
     if (!allowedUsers.length) { errEl.textContent = 'User ID không hợp lệ'; return; }
 
+    const discordChannelIds = platform === 'discord' && channelsRaw
+      ? channelsRaw.split(',').map(s => s.trim()).filter(Boolean)
+      : undefined;
+
     const btn = document.getElementById('btn-create-worker');
     btn.textContent = 'Đang tạo...'; btn.disabled = true;
 
     const res = await api('/api/workers', {
       method: 'POST',
-      body: JSON.stringify({ name, botToken, allowedUsers, systemPrompt, pin, agentId })
+      body: JSON.stringify({ name, platform, botToken, allowedUsers, discordChannelIds, systemPrompt, pin, agentId })
     });
 
     btn.textContent = 'Tạo Worker'; btn.disabled = false;

@@ -2,6 +2,7 @@ import { listWorkers, loadWorker, saveWorker, loadAiAgent } from '../lib/config.
 import { getLogStats } from '../lib/session.js';
 import { log, logError } from '../lib/logger.js';
 import { TelegramBotService } from './telegram-bot.js';
+import { DiscordBotService } from './discord-bot.js';
 import { generateHandoffSummary } from './adapters.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -9,6 +10,7 @@ import { generateHandoffSummary } from './adapters.js';
 export interface WorkerStatus {
   id: string;
   name: string;
+  platform: string;
   running: boolean;
   activeAgentId: string;
   agentName: string;
@@ -16,10 +18,12 @@ export interface WorkerStatus {
   messageCount: number;
 }
 
+type BotService = TelegramBotService | DiscordBotService;
+
 // ─── Manager ─────────────────────────────────────────────────────────────────
 
 class BotManager {
-  private bots: Map<string, TelegramBotService> = new Map(); // workerId → bot
+  private bots: Map<string, BotService> = new Map(); // workerId → bot
 
   startWorker(workerId: string): void {
     // Nếu có trong map nhưng không còn running (bị lỗi) → xoá để restart
@@ -42,10 +46,13 @@ class BotManager {
       throw new Error(`Không tìm thấy agent "${worker.activeAgentId}" cho worker "${worker.name}"`);
     }
 
-    const bot = new TelegramBotService(worker, agent);
+    const platform = worker.platform ?? 'telegram';
+    const bot: BotService = platform === 'discord'
+      ? new DiscordBotService(worker, agent)
+      : new TelegramBotService(worker, agent);
     bot.start();
     this.bots.set(workerId, bot);
-    log('manager', `Đã khởi động worker "${worker.name}" với agent "${agent.name}"`);
+    log('manager', `Đã khởi động worker "${worker.name}" [${platform}] với agent "${agent.name}"`);
   }
 
   async stopWorker(workerId: string): Promise<void> {
@@ -122,6 +129,7 @@ class BotManager {
       return {
         id: worker.id,
         name: worker.name,
+        platform: worker.platform ?? 'telegram',
         running: bot?.isRunning() ?? false,
         activeAgentId: worker.activeAgentId,
         agentName: agent?.name ?? 'Unknown',
@@ -144,6 +152,7 @@ class BotManager {
     return {
       id: worker.id,
       name: worker.name,
+      platform: worker.platform ?? 'telegram',
       running: bot?.isRunning() ?? false,
       activeAgentId: worker.activeAgentId,
       agentName: agent?.name ?? 'Unknown',

@@ -159,7 +159,7 @@ app.get('/api/workers', authMiddleware, (_req: Request, res: Response) => {
 
 app.post('/api/workers', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const { name, botToken, allowedUsers, systemPrompt, pin, agentId } = req.body ?? {};
+    const { name, platform, botToken, allowedUsers, discordChannelIds, systemPrompt, pin, agentId } = req.body ?? {};
     if (!name || !botToken || !allowedUsers || !pin || !agentId) {
       res.status(400).json({ error: 'Thiếu thông tin bắt buộc' }); return;
     }
@@ -170,8 +170,10 @@ app.post('/api/workers', authMiddleware, async (req: Request, res: Response) => 
     const worker: WorkerInstance = {
       id: crypto.randomUUID(),
       name,
+      platform: platform ?? 'telegram',
       botToken,
       allowedUsers: (allowedUsers as number[]).map(Number).filter(n => !isNaN(n)),
+      discordChannelIds: discordChannelIds ?? [],
       systemPrompt: systemPrompt ?? '',
       sessionPin,
       activeAgentId: agentId,
@@ -208,10 +210,11 @@ app.put('/api/workers/:id', authMiddleware, async (req: Request, res: Response) 
   try {
     const worker = loadWorker(req.params.id);
     if (!worker) { res.status(404).json({ error: 'Không tìm thấy worker' }); return; }
-    const { name, botToken, allowedUsers, systemPrompt, pin } = req.body ?? {};
+    const { name, botToken, allowedUsers, discordChannelIds, systemPrompt, pin } = req.body ?? {};
     if (name) worker.name = name;
     if (botToken) worker.botToken = botToken;
     if (allowedUsers) worker.allowedUsers = (allowedUsers as number[]).map(Number).filter(n => !isNaN(n));
+    if (discordChannelIds) worker.discordChannelIds = (discordChannelIds as string[]).map(String).filter(Boolean);
     if (systemPrompt !== undefined) worker.systemPrompt = systemPrompt;
     if (pin && String(pin).length >= 4) worker.sessionPin = await bcrypt.hash(String(pin), 10);
     saveWorker(worker);
