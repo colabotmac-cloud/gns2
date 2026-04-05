@@ -725,6 +725,7 @@
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app').classList.add('visible');
     loadAiAgents();
+    setTimeout(checkUpdate, 30_000);
   }
 
   function showPage(name, el) {
@@ -1318,13 +1319,6 @@
     btn.textContent = 'Đang restart...'; btn.disabled = true;
     await api('/api/update/restart', { method: 'POST' }).catch(() => {});
     setTimeout(() => { window.location.reload(); }, 4000);
-  }
-
-  // Check update 30s sau khi login (không block startup)
-  const _origShowApp = showApp;
-  function showApp() {
-    _origShowApp();
-    setTimeout(checkUpdate, 30_000);
   }
 
   if (TOKEN) showApp();
